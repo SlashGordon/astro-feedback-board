@@ -1,6 +1,6 @@
 {
   "name": "astro-feedback-board",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Anonymous, moderated feedback for Astro sites: a feedback button, inline question cards and a public board, backed by a Cloudflare Worker.",
   "keywords": [
     "astro",
