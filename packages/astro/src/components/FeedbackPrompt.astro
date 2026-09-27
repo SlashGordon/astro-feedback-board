@@ -1,0 +1,57 @@
+---
+import "../styles/feedback.css";
+import { resolveStrings } from "../i18n";
+import { icon } from "../icons";
+import type { Kind } from "../protocol";
+import type { SharedProps } from "../types";
+import FeedbackForm from "./FeedbackForm.astro";
+
+interface Props extends SharedProps {
+  /** Minutes of active use (tab visible, recent interaction) before the prompt appears. Default 5. */
+  after?: number;
+  /** Text of the prompt. Defaults to the "promptQuestion" string. */
+  question?: string;
+  /** Days the prompt stays away after the visitor dismissed or answered it. Default 30. */
+  snoozeDays?: number;
+  /** Screen corner. Default "bottom-left", so it does not cover a floating FeedbackButton. */
+  position?: "bottom-left" | "bottom-right";
+  /** Fixed kind for the form. Without it the visitor picks one. */
+  kind?: Kind;
+}
+
+const { after = 5, question, snoozeDays = 30, position = "bottom-left", kind, ...shared } = Astro.props;
+const t = resolveStrings(shared.lang, shared.strings);
+const text = question ?? t.promptQuestion;
+const uid = `afb-${Math.random().toString(36).slice(2, 9)}`;
+---
+
+<aside
+  class:list={["afb", "afb-prompt", `afb-prompt--${position}`]}
+  data-afb-prompt
+  data-site={shared.site}
+  data-after-ms={Math.max(0, after) * 60_000}
+  data-snooze-days={snoozeDays}
+  aria-labelledby={`${uid}-title`}
+  hidden
+>
+  <div class="afb-prompt-head">
+    <span class="afb-icon-tile"><Fragment set:html={icon("message")} /></span>
+    <p id={`${uid}-title`} class="afb-prompt-question">{text}</p>
+    <button type="button" class="afb-close" data-afb-prompt-dismiss aria-label={t.close}>
+      <Fragment set:html={icon("x")} />
+    </button>
+  </div>
+  <div class="afb-prompt-actions" data-afb-prompt-actions>
+    <button type="button" class="afb-button" data-afb-prompt-open>{t.promptGive}</button>
+    <button type="button" class="afb-button afb-button--ghost" data-afb-prompt-dismiss>{t.promptLater}</button>
+  </div>
+  <div class="afb-prompt-form" data-afb-prompt-form hidden>
+    <FeedbackForm {...shared} kind={kind} question={text} />
+  </div>
+</aside>
+
+<script>
+  import { initPrompts } from "../client/prompt";
+
+  initPrompts();
+</script>

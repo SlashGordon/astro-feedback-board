@@ -1,0 +1,32 @@
+---
+import { FeedbackBoard, FeedbackButton } from "astro-feedback-board/components";
+
+const endpoint = import.meta.env.PUBLIC_FEEDBACK_ENDPOINT ?? "http://localhost:8787";
+---
+
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Feedback-Board</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        max-width: 46rem;
+        margin: 0 auto;
+        padding: 2.5rem 1rem 6rem;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        background: light-dark(#f8fafc, #0b1120);
+        color: light-dark(#0f172a, #e2e8f0);
+      }
+      a { color: light-dark(#2563eb, #60a5fa); }
+      h1 { letter-spacing: -0.02em; }
+    </style>
+  </head>
+  <body>
+    <p><a href="/">← Demo</a></p>
+    <h1>Feedback-Board</h1>
+    <FeedbackBoard site="demo" endpoint={endpoint} lang="de" />
+    <FeedbackButton site="demo" endpoint={endpoint} lang="de" boardUrl="/feedback" />
+  </body>
+</html>

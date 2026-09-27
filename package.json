@@ -1,0 +1,20 @@
+{
+  "name": "astro-feedback-board-monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/astro",
+    "worker",
+    "demo"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:worker": "npm --workspace worker run dev",
+    "test": "npm --workspaces --if-present run test",
+    "typecheck": "npm --workspaces --if-present run typecheck",
+    "dev:demo": "npm --workspace demo run dev"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

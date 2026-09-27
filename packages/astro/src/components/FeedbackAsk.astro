@@ -1,0 +1,26 @@
+---
+import "../styles/feedback.css";
+import { icon } from "../icons";
+import { KIND_ICONS } from "../labels";
+import type { Kind } from "../protocol";
+import type { SharedProps } from "../types";
+import FeedbackForm from "./FeedbackForm.astro";
+
+interface Props extends SharedProps {
+  /** The question shown above the form, for example "Was hat dir gefehlt?". */
+  question: string;
+  /** Fixed kind, for example "idea" for "Welche Funktion fehlt dir?". Without it the visitor picks one. */
+  kind?: Kind;
+}
+
+const { question, kind, ...shared } = Astro.props;
+const uid = `afb-${Math.random().toString(36).slice(2, 9)}`;
+---
+
+<section class="afb afb-card" aria-labelledby={`${uid}-title`}>
+  <div class="afb-card-head">
+    <span class="afb-icon-tile"><Fragment set:html={icon(KIND_ICONS[kind ?? "feedback"])} /></span>
+    <p id={`${uid}-title`} class="afb-card-title">{question}</p>
+  </div>
+  <FeedbackForm {...shared} question={question} kind={kind} />
+</section>

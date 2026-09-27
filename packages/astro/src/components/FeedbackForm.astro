@@ -1,0 +1,122 @@
+---
+// Internal: the form shared by all components. It carries the spam layers:
+// the hidden honeypot field, the minimum fill time and the ALTCHA proof of work.
+import "../styles/feedback.css";
+import { resolveStrings } from "../i18n";
+import { icon } from "../icons";
+import { KIND_ICONS, kindLabels, kindPlaceholders } from "../labels";
+import { type Kind, KINDS, NICKNAME_MAX_LENGTH, VISITOR_RULES } from "../protocol";
+import type { SharedProps } from "../types";
+
+interface Props extends SharedProps {
+  question?: string;
+  /** Fixed kind. Without it the visitor picks one. */
+  kind?: Kind;
+  /** Reply form inside a board thread. The board sets the thread id. */
+  reply?: boolean;
+  /** Comment form for this article key. */
+  article?: string;
+}
+
+const { site, endpoint, lang, context, strings: overrides, question, kind, reply = false, article } = Astro.props;
+const t = resolveStrings(lang, overrides);
+const uid = `afb-${Math.random().toString(36).slice(2, 9)}`;
+const labels = kindLabels(t);
+const placeholders = kindPlaceholders(t);
+const maxLength = VISITOR_RULES.maxLength;
+const placeholder = reply ? t.replyPlaceholder : article ? t.commentPlaceholder : placeholders[kind ?? "feedback"];
+// Replies and comments have no kind.
+const showKinds = !reply && !article && !kind;
+const fixedKind = !reply && !article ? kind : undefined;
+---
+
+<form
+  class="afb-form"
+  data-afb-form
+  data-endpoint={endpoint.replace(/\/+$/, "")}
+  data-site={site}
+  data-context={context === undefined ? undefined : JSON.stringify(context)}
+  data-question={question}
+  data-strings={JSON.stringify(t)}
+  data-afb-reply={reply ? "" : undefined}
+  data-article={article}
+  novalidate
+>
+  {
+    showKinds && (
+      <fieldset class="afb-kinds">
+        <legend class="afb-sr">{t.kindLabel}</legend>
+        {KINDS.map((k) => (
+          <label class="afb-kind">
+            <input type="radio" name="kind" value={k} checked={k === "feedback"} />
+            <span>
+              <Fragment set:html={icon(KIND_ICONS[k])} />
+              {labels[k]}
+            </span>
+          </label>
+        ))}
+      </fieldset>
+    )
+  }
+  {fixedKind && <input type="hidden" name="kind" value={fixedKind} />}
+
+  <div class="afb-textarea-wrap">
+    <label class="afb-sr" for={`${uid}-body`}>{question ?? placeholder}</label>
+    <textarea
+      id={`${uid}-body`}
+      class="afb-input afb-textarea"
+      name="body"
+      rows="4"
+      maxlength={maxLength}
+      required
+      placeholder={placeholder}
+      data-placeholders={showKinds ? JSON.stringify(placeholders) : undefined}></textarea>
+    <span class="afb-counter" data-afb-count aria-hidden="true">0 / {maxLength}</span>
+  </div>
+
+  <div class="afb-hp" aria-hidden="true">
+    <label>Website <input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
+  </div>
+
+  <div class="afb-field">
+    <label class="afb-label" for={`${uid}-nickname`}>{t.nicknameLabel}</label>
+    <input
+      id={`${uid}-nickname`}
+      class="afb-input"
+      type="text"
+      name="nickname"
+      maxlength={NICKNAME_MAX_LENGTH}
+      autocomplete="nickname"
+      placeholder={t.nicknamePlaceholder}
+    />
+  </div>
+
+  <label class="afb-check" data-afb-remember>
+    <input type="checkbox" name="remember" checked />
+    <span>{t.remember}</span>
+  </label>
+  <p class="afb-hint" data-afb-remembered hidden>
+    <Fragment set:html={icon("checkCircle")} />
+    {t.remembered}
+  </p>
+
+  <p class="afb-hint">
+    <Fragment set:html={icon("lock")} />
+    {t.privacyHint}
+  </p>
+
+  <div class="afb-actions">
+    <button type="submit" class="afb-button afb-submit">
+      <span class="afb-spinner" aria-hidden="true"></span>
+      <span data-afb-label>{t.submit}</span>
+      <Fragment set:html={icon("send")} />
+    </button>
+  </div>
+  <p class="afb-status" role="status" aria-live="polite" data-afb-status></p>
+</form>
+
+<script>
+  import { initFeedback } from "../client/feedback";
+
+  initFeedback();
+</script>

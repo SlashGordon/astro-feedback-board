@@ -1,0 +1,62 @@
+---
+import "../styles/feedback.css";
+import { resolveStrings } from "../i18n";
+import type { Kind } from "../protocol";
+import { icon } from "../icons";
+import type { SharedProps } from "../types";
+import FeedbackForm from "./FeedbackForm.astro";
+
+interface Props extends SharedProps {
+  /** "floating" pins the button to a screen corner, "inline" renders it in place. */
+  variant?: "floating" | "inline";
+  position?: "bottom-right" | "bottom-left";
+  /** Button text. Defaults to the "buttonLabel" string. */
+  label?: string;
+  /** Fixed kind. Without it the visitor picks one. */
+  kind?: Kind;
+  /** URL of the page with <FeedbackBoard />. Adds a link to the visitor's own posts. */
+  boardUrl?: string;
+}
+
+const { variant = "floating", position = "bottom-right", label, kind, boardUrl, ...shared } = Astro.props;
+const t = resolveStrings(shared.lang, shared.strings);
+const uid = `afb-${Math.random().toString(36).slice(2, 9)}`;
+---
+
+<button
+  type="button"
+  class:list={["afb", "afb-trigger", `afb-trigger--${variant}`, variant === "floating" && `afb-trigger--${position}`]}
+  data-afb-open={`${uid}-dialog`}
+  data-endpoint={shared.endpoint.replace(/\/+$/, "")}
+  data-site={shared.site}
+  data-badge-one={t.newRepliesOne}
+  data-badge-other={t.newRepliesOther}
+  aria-haspopup="dialog"
+>
+  <Fragment set:html={icon("message")} />
+  {label ?? t.buttonLabel}
+  <span class="afb-badge" data-afb-badge hidden></span>
+</button>
+
+<dialog id={`${uid}-dialog`} class="afb afb-dialog" aria-labelledby={`${uid}-title`}>
+  <div class="afb-dialog-head">
+    <h2 id={`${uid}-title`} class="afb-dialog-title">
+      <span class="afb-icon-tile"><Fragment set:html={icon("message")} /></span>
+      {t.dialogTitle}
+    </h2>
+    <button type="button" class="afb-close" data-afb-close aria-label={t.close}>
+      <Fragment set:html={icon("x")} />
+    </button>
+  </div>
+  <div class="afb-dialog-body">
+    <FeedbackForm {...shared} kind={kind} />
+    {
+      boardUrl && (
+        <a class="afb-mine-link" href={`${boardUrl}#afb-mine`} data-afb-mine-link hidden>
+          {t.myPostsLink}
+          <span aria-hidden="true">→</span>
+        </a>
+      )
+    }
+  </div>
+</dialog>

@@ -1,0 +1,54 @@
+{
+  "name": "astro-feedback-board",
+  "version": "0.1.0",
+  "description": "Anonymous, moderated feedback for Astro sites: a feedback button, inline question cards and a public board, backed by a Cloudflare Worker.",
+  "keywords": [
+    "astro",
+    "astro-component",
+    "withastro",
+    "feedback",
+    "cloudflare-workers",
+    "gdpr"
+  ],
+  "homepage": "https://github.com/SlashGordon/astro-feedback-board#readme",
+  "bugs": {
+    "url": "https://github.com/SlashGordon/astro-feedback-board/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SlashGordon/astro-feedback-board.git",
+    "directory": "packages/astro"
+  },
+  "license": "MIT",
+  "author": "SlashGordon",
+  "type": "module",
+  "sideEffects": [
+    "*.css",
+    "*.astro"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./components": "./src/components/index.ts",
+    "./protocol": "./src/protocol.ts",
+    "./components/*": "./src/components/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "astro": ">=5.0.0"
+  },
+  "devDependencies": {
+    "astro": "^7.3.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}

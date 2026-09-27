@@ -1,0 +1,119 @@
+---
+import "../styles/feedback.css";
+import { resolveStrings } from "../i18n";
+import { icon } from "../icons";
+import { KIND_ICONS, kindLabels, topicStatusLabels } from "../labels";
+import { type Kind, KINDS, TOPIC_STATUSES } from "../protocol";
+import type { SharedProps } from "../types";
+import FeedbackForm from "./FeedbackForm.astro";
+
+interface Props extends SharedProps {
+  /** Preselected kind filter. */
+  kind?: Kind;
+  sort?: "top" | "new";
+  /** Shows the "write a new post" form above the list. Default true. */
+  newPost?: boolean;
+}
+
+const { kind, sort = "top", newPost = true, ...shared } = Astro.props;
+const t = resolveStrings(shared.lang, shared.strings);
+const labels = kindLabels(t);
+const statusLabels = topicStatusLabels(t);
+---
+
+<div
+  class="afb afb-board"
+  data-afb-board
+  data-endpoint={shared.endpoint.replace(/\/+$/, "")}
+  data-site={shared.site}
+  data-lang={shared.lang ?? "en"}
+  data-strings={JSON.stringify(t)}
+>
+  <div class="afb-list-view" data-afb-list-view>
+    {
+      newPost && (
+        <details class="afb-board-new">
+          <summary class="afb-button">
+            <Fragment set:html={icon("plus")} />
+            {t.newPost}
+          </summary>
+          <div class="afb-panel">
+            <FeedbackForm {...shared} />
+          </div>
+        </details>
+      )
+    }
+
+    <section class="afb-panel afb-mine" id="afb-mine" data-afb-mine aria-labelledby="afb-mine-title" hidden>
+      <h2 class="afb-section-title" id="afb-mine-title">
+        {t.mine}
+        <span class="afb-count" data-afb-mine-count></span>
+      </h2>
+      <ul class="afb-mine-list" data-afb-mine-list></ul>
+    </section>
+
+    <div class="afb-toolbar">
+      <div class="afb-tabs" role="group" aria-label={t.kindLabel}>
+        <button type="button" data-afb-kind="" aria-pressed={kind ? "false" : "true"}>{t.filterAll}</button>
+        {
+          KINDS.map((k) => (
+            <button type="button" data-afb-kind={k} aria-pressed={kind === k ? "true" : "false"}>
+              <Fragment set:html={icon(KIND_ICONS[k])} />
+              {labels[k]}
+            </button>
+          ))
+        }
+      </div>
+      <div class="afb-selects">
+        <label class="afb-select-wrap">
+          <span class="afb-sr">{t.sortLabel}</span>
+          <select class="afb-input afb-select" data-afb-sort>
+            <option value="top" selected={sort === "top"}>{t.sortTop}</option>
+            <option value="new" selected={sort === "new"}>{t.sortNew}</option>
+          </select>
+          <Fragment set:html={icon("up")} />
+        </label>
+        <label class="afb-select-wrap">
+          <span class="afb-sr">{t.statusLabel}</span>
+          <select class="afb-input afb-select" data-afb-status-filter>
+            <option value="">{t.statusAll}</option>
+            {TOPIC_STATUSES.map((status) => <option value={status}>{statusLabels[status]}</option>)}
+          </select>
+          <Fragment set:html={icon("up")} />
+        </label>
+      </div>
+    </div>
+
+    <p class="afb-board-message afb-sr" data-afb-message role="status"></p>
+    <ul class="afb-list" data-afb-list aria-busy="true">
+      <li class="afb-skeleton"></li>
+      <li class="afb-skeleton"></li>
+      <li class="afb-skeleton"></li>
+    </ul>
+  </div>
+
+  <section class="afb-thread" data-afb-thread hidden>
+    <a class="afb-back" href="#" data-afb-back>
+      <Fragment set:html={icon("left")} />
+      {t.back}
+    </a>
+    <div class="afb-panel" data-afb-thread-post></div>
+    <div>
+      <h3 class="afb-section-title">
+        {t.replyTitle}
+        <span class="afb-count" data-afb-reply-count></span>
+      </h3>
+      <ul class="afb-replies" data-afb-replies></ul>
+    </div>
+    <div class="afb-panel">
+      <h3 class="afb-section-title">{t.replyFormTitle}</h3>
+      <FeedbackForm {...shared} reply />
+    </div>
+  </section>
+</div>
+
+<script>
+  import { initBoards } from "../client/board";
+
+  initBoards();
+</script>

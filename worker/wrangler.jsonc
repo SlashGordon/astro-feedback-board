@@ -1,0 +1,36 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "astro-feedback-board",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "routes": [{ "pattern": "feedback.dieck-labs.de", "custom_domain": true }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "feedback",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // The Rate Limiting binding only supports periods of 10 or 60 seconds.
+  // 2 posts per minute is the closest fit to "5 posts per 10 minutes".
+  "ratelimits": [
+    { "name": "POST_LIMITER", "namespace_id": "1001", "simple": { "limit": 2, "period": 60 } },
+    { "name": "VOTE_LIMITER", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } }
+  ],
+  // Daily cleanup: rejected/spam posts older than 30 days, used ALTCHA challenges.
+  "triggers": { "crons": ["17 3 * * *"] },
+  "vars": {
+    // Cloudflare Access: team domain (https://<team>.cloudflareaccess.com) and application AUD tag.
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": "",
+    "TEAM_NAME": "Team",
+    // Defaults for newly created sites.
+    "DEFAULT_MODERATE_FEEDBACK": "all",
+    "DEFAULT_MODERATE_REPLIES": "all",
+    "DEFAULT_MODERATE_COMMENTS": "all",
+    "DEFAULT_AUTO_TRUST_AFTER": "0",
+    "DEFAULT_AUTO_TRUST_DAYS": "30"
+  }
+  // Secrets (wrangler secret put): ALTCHA_HMAC_KEY, IP_SALT_SECRET
+}

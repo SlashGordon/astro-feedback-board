@@ -1,0 +1,98 @@
+---
+import "../styles/feedback.css";
+import { resolveStrings } from "../i18n";
+import { REACTION_EMOJI, reactionLabels } from "../labels";
+import { isArticleKey, type Reaction, REACTIONS } from "../protocol";
+import type { SharedProps } from "../types";
+import FeedbackForm from "./FeedbackForm.astro";
+
+interface Props extends SharedProps {
+  /** Key the comments and reactions belong to. Defaults to the page path without a trailing slash. */
+  article?: string;
+  /** Heading above the comments. Defaults to the "commentsTitle" string. */
+  title?: string;
+  /** Reactions to offer, in this order, like on dev.to. Default all; false hides them. */
+  reactions?: readonly Reaction[] | false;
+  /** Shows the comments and the comment form. Default true. */
+  comments?: boolean;
+}
+
+const { article: articleProp, title, reactions = REACTIONS, comments = true, ...shared } = Astro.props;
+const article = articleProp ?? (Astro.url.pathname.replace(/(.)\/+$/, "$1") || "/");
+if (!isArticleKey(article)) {
+  throw new Error(`[feedback-board] invalid article key "${article}": letters, digits and - _ . / : ~ %, at most 200 characters`);
+}
+const t = resolveStrings(shared.lang, shared.strings);
+const uid = `afb-${Math.random().toString(36).slice(2, 9)}`;
+const labels = reactionLabels(t);
+const shown = reactions || [];
+---
+
+<section
+  class="afb afb-comments"
+  data-afb-comments
+  data-endpoint={shared.endpoint.replace(/\/+$/, "")}
+  data-site={shared.site}
+  data-article={article}
+  data-lang={shared.lang ?? "en"}
+  data-strings={JSON.stringify(t)}
+  aria-labelledby={comments ? `${uid}-title` : `${uid}-reactions`}
+>
+  {
+    shown.length > 0 && (
+      <form class="afb-reactions" data-afb-reactions novalidate>
+        <p class="afb-reactions-label" id={`${uid}-reactions`}>
+          {t.reactionsLabel}
+        </p>
+        <div class="afb-reaction-row" role="group" aria-labelledby={`${uid}-reactions`}>
+          {shown.map((reaction) => (
+            <button
+              type="button"
+              class="afb-reaction"
+              data-afb-reaction={reaction}
+              aria-pressed="false"
+              aria-label={labels[reaction]}
+              title={labels[reaction]}
+            >
+              <span class="afb-reaction-emoji" aria-hidden="true">
+                {REACTION_EMOJI[reaction]}
+              </span>
+              <span class="afb-reaction-count" data-afb-reaction-count />
+            </button>
+          ))}
+        </div>
+        <div class="afb-hp" aria-hidden="true">
+          <label>
+            Website <input type="text" name="website" tabindex="-1" autocomplete="off" />
+          </label>
+        </div>
+        <p class="afb-status" role="status" aria-live="polite" data-afb-status />
+      </form>
+    )
+  }
+
+  {
+    comments && (
+      <div class="afb-comments-body">
+        <h2 class="afb-section-title" id={`${uid}-title`}>
+          {title ?? t.commentsTitle}
+          <span class="afb-count" data-afb-comment-count />
+        </h2>
+        <p class="afb-sr" data-afb-message role="status" />
+        <ul class="afb-comment-list" data-afb-comment-list aria-busy="true">
+          <li class="afb-skeleton" />
+        </ul>
+        <div class="afb-panel">
+          <h3 class="afb-section-title">{t.commentFormTitle}</h3>
+          <FeedbackForm {...shared} article={article} />
+        </div>
+      </div>
+    )
+  }
+</section>
+
+<script>
+  import { initComments } from "../client/comments";
+
+  initComments();
+</script>
