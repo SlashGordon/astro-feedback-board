@@ -3,6 +3,12 @@ name: Release
 on:
   push:
     branches: [main]
+  # Publishes an existing release tag to npm, for example after a failed publish job.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish, for example v0.3.0
+        required: true
 
 permissions:
   contents: write
@@ -14,6 +20,7 @@ jobs:
   # that PR tags the release and creates the GitHub Release, which sets
   # `release_created` for the publish job below.
   release-please:
+    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs['packages/astro--release_created'] }}
@@ -24,18 +31,20 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  # Publish to npm only when release-please just cut a new release.
+  # Publish to npm when release-please just cut a new release, or by hand.
   publish:
     needs: release-please
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    if: ${{ always() && (needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write # OIDC — npm trusted publishing + provenance
+    env:
+      TAG: ${{ inputs.tag || needs.release-please.outputs.tag_name }}
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.release-please.outputs.tag_name }}
+          ref: ${{ env.TAG }}
 
       - uses: actions/setup-node@v7
         with:
@@ -51,9 +60,11 @@ jobs:
       - name: Tag matches package.json version
         run: |
           pkg="v$(node -p "require('./packages/astro/package.json').version")"
-          echo "git tag=${{ needs.release-please.outputs.tag_name }}  package.json=$pkg"
-          test "$pkg" = "${{ needs.release-please.outputs.tag_name }}"
+          echo "git tag=$TAG  package.json=$pkg"
+          test "$pkg" = "$TAG"
 
       - run: npm ci
-      - run: npm run typecheck && npm test
+      # Only the package's own tests: the Worker is not published, and CI runs
+      # every test on each push.
+      - run: npm run typecheck && npm test --workspace packages/astro
       - run: npm publish --workspace packages/astro --provenance --access public
