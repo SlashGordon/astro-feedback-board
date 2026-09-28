@@ -1,10 +1,13 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   createTeamReply,
+  DAILY_POSTS_PER_IP,
   deletePost,
   deleteOwnPost,
   type Draft,
+  forgetPostIpHashes,
   moderatePost,
+  PENDING_PER_AUTHOR,
   purgeRejected,
   revokeTrust,
   submitPost,
@@ -140,16 +143,53 @@ describe("deleting", () => {
 
   it("purges rejected and spam posts older than the cutoff", async () => {
     const site = await insertSite(db);
+    // Moderated right away, so alice stays below the pending cap.
     const old = await submitPost(db, site, null, draft(), alice, 10);
-    const spam = await submitPost(db, site, null, draft(), alice, 10);
-    const fresh = await submitPost(db, site, null, draft(), alice, 500);
-    const kept = await submitPost(db, site, null, draft(), alice, 10);
     await moderatePost(db, old.id, "reject", null);
+    const spam = await submitPost(db, site, null, draft(), alice, 10);
     await moderatePost(db, spam.id, "spam", null);
+    const fresh = await submitPost(db, site, null, draft(), alice, 500);
     await moderatePost(db, fresh.id, "reject", null);
+    const kept = await submitPost(db, site, null, draft(), alice, 10);
 
     expect(await purgeRejected(db, 100)).toBe(2);
     expect(await row(fresh.id)).not.toBeNull();
     expect(await row(kept.id)).not.toBeNull();
+  });
+});
+
+describe("post caps", () => {
+  const fromIp = (ipHash: string): Draft => ({ ...draft(), ipHash });
+
+  it("caps posts per IP and day, whatever their status", async () => {
+    const site = await insertSite(db, { moderate_feedback: "none" });
+    for (let i = 0; i < DAILY_POSTS_PER_IP; i++) await submitPost(db, site, null, fromIp("ip-1"), await sha256(`d${i}`));
+    await expect(submitPost(db, site, null, fromIp("ip-1"), bob)).rejects.toThrow("daily_limit");
+    // The next day brings a new IP hash.
+    expect((await submitPost(db, site, null, fromIp("ip-2"), bob)).status).toBe("approved");
+  });
+
+  it("caps pending posts per device and per IP, so a new token does not help", async () => {
+    const site = await insertSite(db);
+    for (let i = 0; i < PENDING_PER_AUTHOR; i++) await submitPost(db, site, null, fromIp("ip-1"), alice);
+    await expect(submitPost(db, site, null, fromIp("ip-2"), alice)).rejects.toThrow("too_many_pending");
+    await expect(submitPost(db, site, null, fromIp("ip-1"), bob)).rejects.toThrow("too_many_pending");
+    await expect(submitPost(db, site, null, fromIp("ip-1"), null)).rejects.toThrow("too_many_pending");
+    expect((await submitPost(db, site, null, fromIp("ip-3"), bob)).status).toBe("pending");
+  });
+
+  it("lets trusted devices through", async () => {
+    const site = await insertSite(db);
+    await grantTrust(db, { authorHash: alice, siteId: "" }, { days: 0, source: "manual" });
+    for (let i = 0; i <= DAILY_POSTS_PER_IP; i++) await submitPost(db, site, null, fromIp("ip-1"), alice);
+  });
+
+  it("forgets IP hashes after the cutoff", async () => {
+    const site = await insertSite(db, { moderate_feedback: "none" });
+    await submitPost(db, site, null, fromIp("ip-1"), alice, 10);
+    await submitPost(db, site, null, fromIp("ip-1"), alice, 500);
+    await forgetPostIpHashes(db, 100);
+    const { results } = await db.prepare("SELECT ip_hash FROM posts ORDER BY created_at").all<{ ip_hash: string | null }>();
+    expect(results.map((r) => r.ip_hash)).toEqual([null, "ip-1"]);
   });
 });

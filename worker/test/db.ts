@@ -16,7 +16,7 @@ function statements(sql: string): string[] {
 }
 
 // Children first, so deletes never trip a foreign key.
-const TABLES = ["seen", "reports", "votes", "reactions", "helpful", "altcha_used", "trust", "posts", "sites"];
+const TABLES = ["ip_salts", "callsigns", "seen", "reports", "votes", "reactions", "helpful", "altcha_used", "trust", "posts", "sites"];
 
 export async function createTestDb() {
   const proxy = await getPlatformProxy<{ DB: D1Database }>({
@@ -55,14 +55,15 @@ export async function insertSite(db: D1Database, overrides: Partial<Site> = {}):
     moderate_comments: "all",
     auto_trust_after: 0,
     auto_trust_days: 30,
+    paused: 0,
     created_at: 0,
     ...overrides,
   };
   await db
     .prepare(
       `INSERT INTO sites (id, name, origin, moderate_feedback, moderate_replies, moderate_comments,
-                          auto_trust_after, auto_trust_days, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                          auto_trust_after, auto_trust_days, paused, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       site.id,
@@ -73,6 +74,7 @@ export async function insertSite(db: D1Database, overrides: Partial<Site> = {}):
       site.moderate_comments,
       site.auto_trust_after,
       site.auto_trust_days,
+      site.paused,
       site.created_at,
     )
     .run();
@@ -94,6 +96,6 @@ export function testEnv(db: D1Database, limits: { post?: boolean; vote?: boolean
     DEFAULT_AUTO_TRUST_AFTER: "0",
     DEFAULT_AUTO_TRUST_DAYS: "30",
     ALTCHA_HMAC_KEY: "test-altcha-key",
-    IP_SALT_SECRET: "test-ip-salt",
+    NTFY_URL: "",
   };
 }

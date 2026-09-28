@@ -10,6 +10,10 @@ export interface Strings {
   remember: string;
   remembered: string;
   privacyHint: string;
+  privacyLink: string;
+  forgetDevice: string;
+  forgetConfirm: string;
+  forgotten: string;
   submit: string;
   sending: string;
   thanksPending: string;
@@ -39,6 +43,10 @@ export interface Strings {
   promptGive: string;
   promptLater: string;
   errorRateLimited: string;
+  errorDailyLimit: string;
+  errorTooManyPending: string;
+  errorAlreadyReacted: string;
+  errorPaused: string;
   errorGeneric: string;
   kindLabel: string;
   kindFeedback: string;
@@ -101,6 +109,10 @@ export const strings: Record<Lang, Strings> = {
     remembered: "Dieses Gerät ist gemerkt.",
     privacyHint:
       "Freigegebenes Feedback ist öffentlich sichtbar. Bitte keine persönlichen Daten wie E-Mail-Adresse oder Telefonnummer eintragen.",
+    privacyLink: "Datenschutz",
+    forgetDevice: "Vergessen",
+    forgetConfirm: "Alle deine Beiträge und Reaktionen löschen und dieses Gerät vergessen?",
+    forgotten: "Erledigt. Deine Beiträge sind gelöscht und dieses Gerät ist vergessen.",
     submit: "Senden",
     sending: "Wird gesendet …",
     thanksPending: "Danke! Wir schauen uns dein Feedback an und schalten es dann frei.",
@@ -111,6 +123,10 @@ export const strings: Record<Lang, Strings> = {
     errorNicknameEmail: "Der Name ist öffentlich. Bitte gib keine E-Mail-Adresse an.",
     errorNicknamePhone: "Der Name ist öffentlich. Bitte gib keine Telefonnummer an.",
     errorRateLimited: "Das waren viele Beiträge in kurzer Zeit. Bitte versuch es in einer Minute noch einmal.",
+    errorDailyLimit: "Von deinem Anschluss kamen heute schon viele Beiträge. Bitte versuch es morgen noch einmal.",
+    errorTooManyPending: "Deine letzten Beiträge warten noch auf Freigabe. Sobald wir sie angeschaut haben, kannst du wieder schreiben.",
+    errorAlreadyReacted: "Von deinem Anschluss kam heute schon diese Reaktion.",
+    errorPaused: "Beiträge sind hier gerade pausiert. Bitte versuch es später noch einmal.",
     errorGeneric: "Das hat nicht geklappt. Bitte versuch es später noch einmal.",
     kindLabel: "Art des Beitrags",
     kindFeedback: "Feedback",
@@ -190,6 +206,10 @@ export const strings: Record<Lang, Strings> = {
     remembered: "This device is remembered.",
     privacyHint:
       "Approved feedback is public. Please don't include personal data such as your email address or phone number.",
+    privacyLink: "Privacy policy",
+    forgetDevice: "Forget",
+    forgetConfirm: "Delete all your posts and reactions and forget this device?",
+    forgotten: "Done. Your posts are deleted and this device is forgotten.",
     submit: "Send",
     sending: "Sending …",
     thanksPending: "Thanks! We'll review your feedback and then publish it.",
@@ -200,6 +220,10 @@ export const strings: Record<Lang, Strings> = {
     errorNicknameEmail: "Your name is public. Please don't enter an email address.",
     errorNicknamePhone: "Your name is public. Please don't enter a phone number.",
     errorRateLimited: "That was a lot of posts in a short time. Please try again in a minute.",
+    errorDailyLimit: "Your connection has sent a lot of posts today. Please try again tomorrow.",
+    errorTooManyPending: "Your last posts are still waiting for review. You can post again once we've looked at them.",
+    errorAlreadyReacted: "Your connection already sent this reaction today.",
+    errorPaused: "Posting is paused here right now. Please try again later.",
     errorGeneric: "Something went wrong. Please try again later.",
     kindLabel: "Type of post",
     kindFeedback: "Feedback",
@@ -279,6 +303,10 @@ export const strings: Record<Lang, Strings> = {
     remembered: "Este dispositivo está recordado.",
     privacyHint:
       "Los comentarios aprobados son públicos. Por favor, no incluyas datos personales como tu correo electrónico o número de teléfono.",
+    privacyLink: "Privacidad",
+    forgetDevice: "Olvidar",
+    forgetConfirm: "¿Borrar todas tus publicaciones y reacciones y olvidar este dispositivo?",
+    forgotten: "Listo. Tus publicaciones se han borrado y este dispositivo se ha olvidado.",
     submit: "Enviar",
     sending: "Enviando …",
     thanksPending: "¡Gracias! Revisaremos tu comentario y después lo publicaremos.",
@@ -289,6 +317,10 @@ export const strings: Record<Lang, Strings> = {
     errorNicknameEmail: "Tu nombre es público. No indiques una dirección de correo.",
     errorNicknamePhone: "Tu nombre es público. No indiques un número de teléfono.",
     errorRateLimited: "Demasiadas publicaciones en poco tiempo. Inténtalo de nuevo en un minuto.",
+    errorDailyLimit: "Hoy ya llegaron muchas publicaciones desde tu conexión. Inténtalo de nuevo mañana.",
+    errorTooManyPending: "Tus últimas publicaciones siguen pendientes de revisión. Podrás publicar de nuevo cuando las hayamos revisado.",
+    errorAlreadyReacted: "Hoy ya llegó esta reacción desde tu conexión.",
+    errorPaused: "Las publicaciones están en pausa ahora mismo. Inténtalo de nuevo más tarde.",
     errorGeneric: "Algo salió mal. Inténtalo de nuevo más tarde.",
     kindLabel: "Tipo de publicación",
     kindFeedback: "Comentario",

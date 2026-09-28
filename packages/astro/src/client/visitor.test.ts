@@ -73,6 +73,27 @@ describe("visitor", () => {
     expect(visitor.nickname()).toBe("Hans");
   });
 
+  it("forgets the device on the Worker and in storage", async () => {
+    const fetch = stubMe(meResponse(1));
+    const storage = memoryStorage();
+    storage.setItem("other:key", "stays");
+    const visitor = createVisitor(() => storage);
+    visitor.remember(TOKEN, "Hans");
+    visitor.snooze("prompt", 99);
+    const listener = vi.fn();
+    visitor.watch("https://w", "demo", listener);
+    await vi.waitFor(() => expect(listener).toHaveBeenCalledWith(meResponse(1)));
+
+    await visitor.forget("https://w");
+    const [url, init] = fetch.mock.calls.at(-1) as unknown as [string, RequestInit];
+    expect(url).toBe("https://w/v1/me");
+    expect(init.method).toBe("DELETE");
+    expect(new Headers(init.headers).get("x-author-token")).toBe(TOKEN);
+    expect([visitor.token(), visitor.nickname(), visitor.snoozedUntil("prompt")]).toEqual([null, null, 0]);
+    expect(storage.getItem("other:key")).toBe("stays");
+    expect(listener).toHaveBeenLastCalledWith(meResponse(0));
+  });
+
   it("sends the token with requests", async () => {
     const fetch = stubMe();
     const storage = memoryStorage();

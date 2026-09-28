@@ -7,7 +7,7 @@
 
 Anonymous, moderated feedback for Astro sites. Visitors post feedback without an account, an admin approves it in a small panel, and one Cloudflare Worker serves all sites.
 
-`<FeedbackButton />`, `<FeedbackAsk />` and `<FeedbackBoard />` cover feedback with votes, replies, the reply badge, per-site moderation and trusted devices. `<FeedbackComments />` adds dev.to-style reactions and moderated comments to articles, and `<FeedbackPrompt />` asks for feedback after some minutes of active use. Merging duplicates, reports and ntfy notifications are not built yet.
+`<FeedbackButton />`, `<FeedbackAsk />` and `<FeedbackBoard />` cover feedback with votes, replies, the reply badge, per-site moderation and trusted devices. `<FeedbackComments />` adds dev.to-style reactions and moderated comments to articles, and `<FeedbackPrompt />` asks for feedback after some minutes of active use. Merging duplicates and reports are not built yet.
 
 The package started as the feedback system of [Fuseplan](https://www.fuseplan.app/) and was extracted from the app so other Astro sites can use it.
 
@@ -39,12 +39,13 @@ Open the demo under `localhost:4321`. The Worker only accepts posts from origins
 
 ## Deploying the Worker
 
-1. `npx wrangler d1 create feedback` and put the database id into `worker/wrangler.jsonc`.
+1. `npx wrangler d1 create feedback --jurisdiction eu` and put the database id into `worker/wrangler.jsonc`. The jurisdiction keeps the stored data in the EU.
 2. Change the route in `wrangler.jsonc` to your own domain.
 3. `npm --workspace worker run db:migrate:remote`
-4. Set the secrets: `npx wrangler secret put ALTCHA_HMAC_KEY` and `npx wrangler secret put IP_SALT_SECRET` (long random strings).
-5. Create a Cloudflare Access application for `<your-domain>/admin*` and set `ACCESS_TEAM_DOMAIN` (`https://<team>.cloudflareaccess.com`) and `ACCESS_AUD` in `wrangler.jsonc`. The Worker checks the Access JWT itself and answers 403 without it.
-6. `npm --workspace worker run deploy`
+4. Set the secret: `npx wrangler secret put ALTCHA_HMAC_KEY` (a long random string).
+5. Optional: set `NTFY_URL` in `wrangler.jsonc` to an ntfy topic (`https://ntfy.sh/<long-random-topic>`) to get a push for every new post, and `npx wrangler secret put NTFY_TOKEN` if the topic needs a token. The push contains the site, the kind and a link to the admin panel. The post text is only included with `NTFY_INCLUDE_TEXT` set to `"true"`, because it then goes to the ntfy server.
+6. Create a Cloudflare Access application for `<your-domain>/admin*` and set `ACCESS_TEAM_DOMAIN` (`https://<team>.cloudflareaccess.com`) and `ACCESS_AUD` in `wrangler.jsonc`. The Worker checks the Access JWT itself and answers 403 without it.
+7. `npm --workspace worker run deploy`
 
 ## Using the components
 
@@ -77,9 +78,9 @@ The board goes on its own page, for example `src/pages/feedback.astro`:
 <FeedbackBoard site="fuseplan" endpoint="https://feedback.dieck-labs.de" lang="de" />
 ```
 
-It lists approved posts with votes, filters by kind and status, and opens a thread view with replies. Visitors who ticked "Auf diesem Gerät merken" also see their own posts there, including pending ones, and can delete them.
+It lists approved posts with votes, filters by kind and status, and opens a thread view with replies. Visitors who ticked "Auf diesem Gerät merken" also see their own posts there, including pending ones, and can delete them. The box is unticked by default.
 
-Shared props: `site`, `endpoint`, `lang` (`de`, `en`, `es`), `context` (JSON sent with each post) and `strings` (overrides for the built-in texts).
+Shared props: `site`, `endpoint`, `lang` (`de`, `en`, `es`), `context` (JSON sent with each post), `privacyUrl` (link to your privacy policy, shown in every form) and `strings` (overrides for the built-in texts).
 
 - `FeedbackButton`: `variant` (`floating` or `inline`), `position` (`bottom-right` or `bottom-left`), `label`, `kind` and `boardUrl` (adds a link to the visitor's own posts on the board).
 - `FeedbackAsk`: `question` and `kind`.
@@ -95,11 +96,36 @@ To send data that only exists at runtime, such as app state, define a hook befor
 window.feedbackBoard = { getContext: () => ({ plan: currentPlan.id }) };
 ```
 
+The context is stored with the post for as long as the post exists and is shown in the admin panel. Don't put user IDs, email addresses or other personal data into it.
+
 Every form has the spam layers built in: a honeypot field that people never see, a minimum of 3 seconds between rendering and sending, and an ALTCHA proof of work that the browser solves in the background. Reactions use the same layers.
+
+The Worker also sets limits that a script cannot get around by dropping or rotating its device token. The key is a hash of the IP address with a random salt per day. The Worker stores the salt in D1 and deletes it after two days. From then on nobody, not even the operator, can trace the stored hashes on posts, votes and reactions back to an IP. The cron also deletes the hashes on posts and reactions after two days.
+
+- At most 10 posts per IP and day, and at most 3 posts per device or IP waiting in the queue. Trusted devices are exempt.
+- One vote per post and one of each reaction per article, per IP and day.
+
+If spam gets through anyway, pause the site in the admin panel. A paused site refuses all posts, votes and reactions until you unpause it.
 
 Styling uses CSS custom properties: `--afb-accent`, `--afb-accent-fg`, `--afb-bg`, `--afb-bg-subtle`, `--afb-fg`, `--afb-muted`, `--afb-border`, `--afb-border-strong`, `--afb-radius`, `--afb-font`, `--afb-error`, `--afb-success`, `--afb-offset` and `--afb-z`. The components use the page's font unless `--afb-font` is set and load no web fonts.
 
 The components switch to dark colors when the page declares `color-scheme: dark`, or `color-scheme: light dark` and the visitor's system is set to dark. Pages without a `color-scheme` stay light.
+
+## Privacy
+
+The components set no cookies, load no third-party scripts or fonts and write to localStorage only after the visitor acts: the device token and nickname after a post with "Auf diesem Gerät merken" ticked, and a snooze time after the visitor dismisses the prompt. A remembered device shows a "Vergessen" button in every form. It deletes the device's posts (with the replies under them), reactions, callsign and trust on the Worker, then all `afb:` keys in localStorage.
+
+What the Worker keeps:
+
+| Data | How long |
+| --- | --- |
+| Post text, nickname, page URL without query, context | Approved posts until deleted, rejected and spam posts 30 days |
+| Device hash (sha256 of the token) on posts, reactions and read markers | Until the posts are deleted or the device is forgotten |
+| Daily IP hash on posts and reactions | 2 days |
+| Daily IP salt | 2 days, after that votes and IP-keyed reactions are anonymous |
+| Signatures of used ALTCHA challenges | Until the daily cleanup after they expire (30 minutes) |
+
+Visitors without a remembered device cannot delete their posts themselves, so name a contact for deletion requests in your privacy policy. [docs/datenschutz.md](docs/datenschutz.md) is a German template for that section of the privacy policy. The Worker runs on Cloudflare, which processes the IP address of every request, including the requests that `<FeedbackBoard />` and `<FeedbackComments />` send when the page loads.
 
 ## License
 

@@ -274,7 +274,7 @@ export const adminHtml = /* html */ `<!doctype html>
     return "gerade eben";
   }
   const fullDate = (ts) => new Date(ts).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
-  const nick = (p) => p.nickname || "Anonym #" + (p.author_hash || p.id).slice(0, 3);
+  const nick = (p) => p.nickname || p.callsign || "Anonym";
   const siteQuery = () => (siteFilter.value ? "?site=" + encodeURIComponent(siteFilter.value) : "");
   const KINDS = ${JSON.stringify(KIND_LABELS)};
   const TOPICS = ${JSON.stringify(TOPIC_LABELS)};
@@ -283,7 +283,7 @@ export const adminHtml = /* html */ `<!doctype html>
     if (isTeam) return h("span", { class: "avatar team", "aria-hidden": "true" }, icon("check"));
     let hash = 0;
     for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-    const initials = name.replace("Anonym #", "#").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+    const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
     const el = h("span", { class: "avatar", "aria-hidden": "true" }, initials);
     el.style.background = "hsl(" + (hash % 360) + " 55% 42%)";
     return el;
@@ -596,6 +596,7 @@ export const adminHtml = /* html */ `<!doctype html>
       const data = Object.fromEntries(new FormData(form));
       data.auto_trust_after = Number(data.auto_trust_after);
       data.auto_trust_days = Number(data.auto_trust_days);
+      data.paused = form.elements.paused.checked;
       try {
         await api("/sites", { method: "POST", body: JSON.stringify(data) });
         notify("Gespeichert");
@@ -603,7 +604,7 @@ export const adminHtml = /* html */ `<!doctype html>
         renderSites();
       } catch (err) { fail(err); }
     } },
-      h("h2", {}, icon(s ? "globe" : "plus"), s ? s.name : "Neue Site"),
+      h("h2", {}, icon(s ? "globe" : "plus"), s ? s.name : "Neue Site", s?.paused ? chip("Pausiert", "bad") : null),
       field("ID", h("input", { class: "input", name: "id", value: s?.id ?? "", required: true, readonly: !!s, pattern: "[a-z0-9][a-z0-9-]*" }), s ? null : "Kleinbuchstaben, Ziffern und Bindestriche"),
       field("Name", h("input", { class: "input", name: "name", value: s?.name ?? "", required: true })),
       field("Origins", h("input", { class: "input", name: "origin", value: s?.origin ?? "", required: true, placeholder: "https://example.com http://localhost:4321" }), "Mehrere mit Leerzeichen trennen", true),
@@ -612,6 +613,8 @@ export const adminHtml = /* html */ `<!doctype html>
       field("Moderation Kommentare", modeSelect("moderate_comments", s?.moderate_comments ?? "all")),
       field("Auto-Trust nach Freigaben", h("input", { class: "input", name: "auto_trust_after", type: "number", min: 0, value: s?.auto_trust_after ?? 0 }), "0 = aus"),
       field("Auto-Trust gilt Tage", h("input", { class: "input", name: "auto_trust_days", type: "number", min: 0, value: s?.auto_trust_days ?? 30 }), "0 = dauerhaft"),
+      h("label", { class: "check wide" }, h("input", { type: "checkbox", name: "paused", checked: !!s?.paused }),
+        "Pausieren: keine neuen Beiträge, Stimmen und Reaktionen"),
       h("div", { class: "form-actions" }, h("button", { class: "btn btn-primary", type: "submit" }, icon("check"), s ? "Speichern" : "Site anlegen")),
     );
     return form;

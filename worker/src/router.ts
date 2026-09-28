@@ -5,14 +5,15 @@
 import type { Env } from "./env";
 import { findFeedback, type FeedbackRef } from "./posts";
 import { assertSiteOrigin, getSite, type Site } from "./sites";
-import { dailyIpHash, HttpError } from "./util";
+import { dailyIpHash } from "./ip";
+import { HttpError } from "./util";
 
 type Limiter = "POST_LIMITER" | "VOTE_LIMITER";
 
 /**
  * target "site": the :site param names a registered site.
  * target "feedback": the :id param names approved feedback; its site is loaded too.
- * write: origin check plus rate limit keyed by the daily IP hash.
+ * write: origin check, paused-site check and rate limit keyed by the daily IP hash.
  */
 type Guards = { target?: undefined; write?: undefined } | { target: "site" | "feedback"; write?: Limiter };
 
@@ -21,6 +22,8 @@ export interface RequestContext {
   env: Env;
   url: URL;
   params: Record<string, string>;
+  /** Keeps the Worker alive for work after the response, like notifications. */
+  waitUntil(promise: Promise<unknown>): void;
 }
 
 type Resolved<G extends Guards> = RequestContext &
@@ -74,7 +77,8 @@ async function resolve(ctx: RequestContext, guards: Guards): Promise<Record<stri
   if (!guards.write) return { ...ctx, site, feedback };
 
   assertSiteOrigin(ctx.request, site);
-  const ipHash = await dailyIpHash(ctx.request, ctx.env.IP_SALT_SECRET);
+  if (site.paused) throw new HttpError(503, "site_paused");
+  const ipHash = await dailyIpHash(ctx.request, ctx.env.DB);
   const { success } = await ctx.env[guards.write].limit({ key: ipHash });
   if (!success) throw new HttpError(429, "rate_limited");
   return { ...ctx, site, feedback, ipHash };
@@ -82,13 +86,19 @@ async function resolve(ctx: RequestContext, guards: Guards): Promise<Record<stri
 
 /** Finds the route for a path and runs it. Unknown paths and methods answer 404. */
 export function router(routes: Route[]) {
-  return async (request: Request, env: Env, url: URL, path = url.pathname): Promise<Response> => {
+  return async (
+    request: Request,
+    env: Env,
+    url: URL,
+    path = url.pathname,
+    waitUntil: (promise: Promise<unknown>) => void = () => {},
+  ): Promise<Response> => {
     for (const r of routes) {
       if (r.method !== request.method) continue;
       const match = path.match(r.pattern);
       if (!match) continue;
       const params = Object.fromEntries(r.keys.map((key, i) => [key, match[i + 1]]));
-      return r.handle({ request, env, url, params });
+      return r.handle({ request, env, url, params, waitUntil });
     }
     throw new HttpError(404, "not_found");
   };

@@ -5,7 +5,9 @@ import { type Challenge, MIN_FILL_MS } from "astro-feedback-board/protocol";
 import { hmacSha256, safeEqual, sha256 } from "./util";
 
 export const CHALLENGE_TTL_MS = 30 * 60 * 1000;
-export const MAX_NUMBER = 50_000;
+// Solving takes on average MAX_NUMBER / 2 hashes: about a second in a desktop
+// browser. The components solve in the background while the visitor types.
+export const MAX_NUMBER = 250_000;
 
 export interface Solution {
   algorithm: string;

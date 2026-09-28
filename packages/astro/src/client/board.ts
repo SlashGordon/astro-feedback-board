@@ -15,6 +15,7 @@ import type {
 } from "../protocol";
 import { ApiError } from "./api";
 import { avatar, type Child, displayName, h, svg } from "./dom";
+import { errorMessage } from "./lib";
 import { visitor } from "./visitor";
 
 class Board {
@@ -195,7 +196,7 @@ class Board {
 
   private author(post: PublicPost): HTMLElement {
     const name = displayName(this.t, post);
-    return h("span", { class: "afb-author" }, avatar(post.nickname ? name : `#${post.tag}`, post.is_team), name);
+    return h("span", { class: "afb-author" }, avatar(name, post.is_team), name);
   }
 
   private voteButton(post: PublicPost): HTMLElement {
@@ -228,7 +229,7 @@ class Board {
         this.setVoteState(b, voted, votes);
       });
     } catch (error) {
-      this.flash(error instanceof ApiError && error.code === "rate_limited" ? this.t.errorRateLimited : this.t.errorGeneric);
+      this.flash(errorMessage(error instanceof ApiError ? error.code : undefined, this.t));
     } finally {
       button.removeAttribute("aria-busy");
     }
@@ -281,7 +282,7 @@ class Board {
               return h(
                 "li",
                 { class: `afb-reply${reply.is_team ? " afb-reply--team" : ""}` },
-                avatar(reply.nickname ? name : `#${reply.tag}`, reply.is_team),
+                avatar(name, reply.is_team),
                 h(
                   "div",
                   { class: "afb-bubble" },

@@ -12,6 +12,8 @@ export interface Site {
   moderate_comments: ModerationMode;
   auto_trust_after: number;
   auto_trust_days: number;
+  /** 1: the kill switch is on and every write answers 503. */
+  paused: number;
   created_at: number;
 }
 
@@ -81,6 +83,7 @@ export interface SiteInput {
   moderate_comments?: unknown;
   auto_trust_after?: unknown;
   auto_trust_days?: unknown;
+  paused?: unknown;
 }
 
 /** Creates or updates a site. Missing settings fall back to the defaults. */
@@ -114,13 +117,25 @@ export async function saveSite(db: D1Database, input: SiteInput, defaults: SiteS
   await db
     .prepare(
       `INSERT INTO sites (id, name, origin, moderate_feedback, moderate_replies, moderate_comments,
-                          auto_trust_after, auto_trust_days, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          auto_trust_after, auto_trust_days, paused, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (id) DO UPDATE SET name = excluded.name, origin = excluded.origin,
          moderate_feedback = excluded.moderate_feedback, moderate_replies = excluded.moderate_replies,
-         moderate_comments = excluded.moderate_comments, auto_trust_after = excluded.auto_trust_after, auto_trust_days = excluded.auto_trust_days`,
+         moderate_comments = excluded.moderate_comments, auto_trust_after = excluded.auto_trust_after, auto_trust_days = excluded.auto_trust_days,
+         paused = excluded.paused`,
     )
-    .bind(id, name, origins.join(" "), moderateFeedback, moderateReplies, moderateComments, autoTrustAfter, autoTrustDays, now)
+    .bind(
+      id,
+      name,
+      origins.join(" "),
+      moderateFeedback,
+      moderateReplies,
+      moderateComments,
+      autoTrustAfter,
+      autoTrustDays,
+      input.paused === true ? 1 : 0,
+      now,
+    )
     .run();
   cache = null;
   return id;

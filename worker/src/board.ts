@@ -10,6 +10,7 @@ import type {
   TopicStatus,
   VoteResponse,
 } from "astro-feedback-board/protocol";
+import { callsign } from "./callsign";
 import type { PostRow } from "./posts";
 import type { Site } from "./sites";
 import { HttpError } from "./util";
@@ -22,7 +23,7 @@ export function publicPost(row: ListedPost): PublicPost {
     kind: row.parent_id || row.article ? undefined : row.kind,
     body: row.body,
     nickname: row.nickname,
-    tag: (row.author_hash ?? row.id).slice(0, 3),
+    callsign: row.author_seq === null ? null : callsign(row.site_id, row.author_seq),
     is_team: row.is_team === 1,
     topic_status: row.topic_status,
     page_url: row.page_url,

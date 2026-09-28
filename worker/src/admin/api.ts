@@ -1,5 +1,6 @@
 // Admin API under /admin/api. Only reachable after verifyAccess() succeeded.
 import { checkBody, isKind, isTopicStatus, TEAM_RULES } from "astro-feedback-board/protocol";
+import { callsign } from "../callsign";
 import type { Env } from "../env";
 import {
   createTeamReply,
@@ -23,12 +24,22 @@ function teamBody(value: unknown): string {
   return body;
 }
 
+interface AuthorRow {
+  site_id: string;
+  author_seq: number | null;
+}
+
+/** Adds the callsign visitors see ("Lunar Otter 42"). */
+function withCallsign<T extends AuthorRow>(row: T): T & { callsign: string | null } {
+  return { ...row, callsign: row.author_seq === null ? null : callsign(row.site_id, row.author_seq) };
+}
+
 const TRUSTED = trustedSql("p.author_hash", "p.site_id", "?1");
 
 async function queue(db: D1Database, site: string | null): Promise<Response> {
   const statement = db.prepare(
     `SELECT p.id, p.site_id, s.name AS site_name, p.parent_id, p.kind, p.article, parent.body AS parent_body,
-            p.page_url, p.body, p.nickname, p.author_hash, p.context, p.created_at,
+            p.page_url, p.body, p.nickname, p.author_hash, p.author_seq, p.context, p.created_at,
             ${TRUSTED} AS trusted
      FROM posts p
      JOIN sites s ON s.id = p.site_id
@@ -37,14 +48,14 @@ async function queue(db: D1Database, site: string | null): Promise<Response> {
      ORDER BY p.created_at
      LIMIT 500`,
   );
-  const { results } = await (site ? statement.bind(Date.now(), site) : statement.bind(Date.now())).all();
-  return json({ posts: results });
+  const { results } = await (site ? statement.bind(Date.now(), site) : statement.bind(Date.now())).all<AuthorRow>();
+  return json({ posts: results.map(withCallsign) });
 }
 
 /** Recent board feedback, or with comments the recent comments on articles, each with its replies. */
 async function recentPosts(db: D1Database, site: string | null, comments: boolean): Promise<Response> {
   const statement = db.prepare(
-    `SELECT p.id, p.site_id, s.name AS site_name, p.kind, p.article, p.page_url, p.body, p.nickname, p.author_hash,
+    `SELECT p.id, p.site_id, s.name AS site_name, p.kind, p.article, p.page_url, p.body, p.nickname, p.author_hash, p.author_seq,
             p.status, p.topic_status, p.context, p.created_at,
             (SELECT COUNT(*) FROM votes v WHERE v.post_id = p.id) AS votes,
             ${TRUSTED} AS trusted
@@ -54,23 +65,26 @@ async function recentPosts(db: D1Database, site: string | null, comments: boolea
      ORDER BY p.created_at DESC
      LIMIT 100`,
   );
-  const { results: feedback } = await (site ? statement.bind(Date.now(), site) : statement.bind(Date.now())).all<{
-    id: string;
-  }>();
+  const { results: feedback } = await (site ? statement.bind(Date.now(), site) : statement.bind(Date.now())).all<
+    AuthorRow & { id: string }
+  >();
   if (feedback.length === 0) return json({ feedback: [] });
 
   const placeholders = feedback.map(() => "?").join(",");
   const { results: replies } = await db
     .prepare(
-      `SELECT id, parent_id, site_id, body, nickname, author_hash, is_team, status, created_at FROM posts
+      `SELECT id, parent_id, site_id, body, nickname, author_hash, author_seq, is_team, status, created_at FROM posts
        WHERE parent_id IN (${placeholders}) AND status IN ('pending', 'approved')
        ORDER BY created_at`,
     )
     .bind(...feedback.map((f) => f.id))
-    .all<{ parent_id: string }>();
+    .all<AuthorRow & { parent_id: string }>();
 
   return json({
-    feedback: feedback.map((f) => ({ ...f, replies: replies.filter((r) => r.parent_id === f.id) })),
+    feedback: feedback.map((f) => ({
+      ...withCallsign(f),
+      replies: replies.filter((r) => r.parent_id === f.id).map(withCallsign),
+    })),
   });
 }
 

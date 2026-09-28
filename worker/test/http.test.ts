@@ -1,9 +1,10 @@
 // Through the Worker's fetch handler: route guards, CORS and a full submit.
-import { MIN_FILL_MS, type Challenge } from "astro-feedback-board/protocol";
+import { MIN_FILL_MS } from "astro-feedback-board/protocol";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "../src/index";
-import { sha256 } from "../src/util";
+import { dailyIpHash, deleteOldSalts } from "../src/ip";
 import { createTestDb, insertSite, ORIGIN, testEnv } from "./db";
+import { solve } from "./solve";
 
 const test = await createTestDb();
 const db = test.db;
@@ -13,22 +14,17 @@ beforeEach(() => test.reset());
 afterEach(() => vi.useRealTimers());
 afterAll(() => test.dispose());
 
+/** Work the Worker handed to ctx.waitUntil, like notifications. */
+let background: Promise<unknown>[] = [];
+
 function call(path: string, init: RequestInit = {}, env = testEnv(db)): Promise<Response> {
   const request = new Request(`https://feedback.test${path}`, init);
-  return worker.fetch(request as Request<unknown, IncomingRequestCfProperties>, env);
+  const ctx = { waitUntil: (promise: Promise<unknown>) => void background.push(promise) } as unknown as ExecutionContext;
+  return worker.fetch(request as Request<unknown, IncomingRequestCfProperties>, env, ctx);
 }
 
 function post(path: string, body: unknown, headers: Record<string, string> = {}, env = testEnv(db)) {
   return call(path, { method: "POST", body: JSON.stringify(body), headers: { origin: ORIGIN, ...headers } }, env);
-}
-
-async function solve(c: Challenge): Promise<string> {
-  for (let n = 0; n <= c.maxnumber; n++) {
-    if ((await sha256(c.salt + n)) === c.challenge) {
-      return btoa(JSON.stringify({ algorithm: c.algorithm, challenge: c.challenge, number: n, salt: c.salt, signature: c.signature }));
-    }
-  }
-  throw new Error("unsolvable");
 }
 
 /** Fetches and solves a challenge, then moves the clock past the minimum fill time. */
@@ -172,6 +168,95 @@ describe("comments and reactions", () => {
     const site = await insertSite(db);
     const res = await post(`/v1/sites/${site.id}/reactions`, { article: "/a", reaction: "poop" });
     expect(await res.json()).toMatchObject({ error: "invalid_reaction" });
+  });
+});
+
+describe("abuse limits", () => {
+  it("counts one vote per IP, however often the token changes", async () => {
+    const site = await insertSite(db, { moderate_feedback: "none" });
+    const { id } = await (
+      await post(`/v1/sites/${site.id}/feedback`, { body: "Bitte einen Dark Mode einbauen", altcha: await altcha() })
+    ).json<{ id: string }>();
+    const vote = (token: string, ip = "1.2.3.4") =>
+      post(`/v1/feedback/${id}/vote`, {}, { "x-author-token": token, "cf-connecting-ip": ip }).then((r) => r.json());
+    expect(await vote(TOKEN)).toEqual({ voted: true, votes: 1 });
+    expect(await vote("f".repeat(32))).toEqual({ voted: false, votes: 0 });
+    expect(await vote("e".repeat(32), "5.6.7.8")).toEqual({ voted: true, votes: 1 });
+  });
+
+  it("refuses every write while a site is paused", async () => {
+    const site = await insertSite(db, { paused: 1 });
+    for (const [path, body] of [
+      [`/v1/sites/${site.id}/feedback`, { body: "Ein ausreichend langer Text" }],
+      [`/v1/sites/${site.id}/reactions`, { article: "/a", reaction: "like" }],
+    ] as const) {
+      const res = await post(path, body);
+      expect(res.status).toBe(503);
+      expect(await res.json()).toMatchObject({ error: "site_paused" });
+    }
+    // Reading still works.
+    expect((await call(`/v1/sites/${site.id}/feedback`)).status).toBe(200);
+  });
+
+  it("sends new posts to ntfy after answering, without their text by default", async () => {
+    const site = await insertSite(db, { name: "Fuseplan" });
+    const payload = await altcha();
+    const fetch = vi.fn(async () => new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    try {
+      background = [];
+      const env = { ...testEnv(db), NTFY_URL: "https://ntfy.test/feedback-topic", NTFY_TOKEN: "tk" };
+      const res = await post(`/v1/sites/${site.id}/feedback`, { body: "Bitte einen Dark Mode einbauen", altcha: payload }, {}, env);
+      expect(res.status).toBe(201);
+      await Promise.all(background);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://ntfy.test");
+    expect(new Headers(init.headers).get("authorization")).toBe("Bearer tk");
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      topic: "feedback-topic",
+      title: "Fuseplan: Feedback wartet auf Freigabe",
+      message: "Im Admin-Panel ansehen",
+      click: "https://feedback.test/admin#queue",
+    });
+  });
+
+});
+
+describe("privacy", () => {
+  it("forgets a device: posts, reactions, callsign and trust", async () => {
+    const site = await insertSite(db, { moderate_feedback: "none" });
+    const token = { "x-author-token": TOKEN };
+    await post(`/v1/sites/${site.id}/feedback`, { body: "Bitte einen Dark Mode einbauen", altcha: await altcha() }, token);
+    await post(`/v1/sites/${site.id}/reactions`, { article: "/a", reaction: "like", altcha: await altcha() }, token);
+    await post(`/v1/sites/${site.id}/feedback`, { body: "Von jemand anderem geschrieben", altcha: await altcha() }, {
+      "x-author-token": "f".repeat(32),
+      "cf-connecting-ip": "9.9.9.9",
+    });
+
+    expect((await call("/v1/me", { method: "DELETE" })).status).toBe(401);
+    expect((await call("/v1/me", { method: "DELETE", headers: token })).status).toBe(204);
+
+    const count = (sql: string) => db.prepare(sql).first<number>("n");
+    expect(await count("SELECT COUNT(*) AS n FROM posts")).toBe(1);
+    expect(await count("SELECT COUNT(*) AS n FROM reactions")).toBe(0);
+    expect(await count("SELECT COUNT(*) AS n FROM callsigns")).toBe(1);
+  });
+
+  it("uses a random salt per day and deletes it after two days", async () => {
+    const request = new Request("https://feedback.test", { headers: { "cf-connecting-ip": "1.2.3.4" } });
+    const day1 = new Date("2026-01-01T12:00:00Z");
+    const day2 = new Date("2026-01-02T12:00:00Z");
+    const first = await dailyIpHash(request, db, day1);
+    expect(await dailyIpHash(request, db, day1)).toBe(first);
+    expect(await dailyIpHash(request, db, day2)).not.toBe(first);
+
+    await deleteOldSalts(db, new Date("2026-01-03T00:10:00Z"));
+    const days = await db.prepare("SELECT day FROM ip_salts ORDER BY day").all<{ day: string }>();
+    expect(days.results.map((r) => r.day)).toEqual(["2026-01-02"]);
   });
 });
 

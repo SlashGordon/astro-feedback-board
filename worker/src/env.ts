@@ -11,6 +11,11 @@ export interface Env {
   DEFAULT_AUTO_TRUST_AFTER: string;
   DEFAULT_AUTO_TRUST_DAYS: string;
   ALTCHA_HMAC_KEY: string;
-  IP_SALT_SECRET: string;
+  /** ntfy topic URL for new posts, for example https://ntfy.sh/my-feedback. Empty: no notifications. */
+  NTFY_URL: string;
+  /** "true" puts the post text into the notification. Default: title and link only. */
+  NTFY_INCLUDE_TEXT?: string;
+  /** Optional ntfy access token (secret). */
+  NTFY_TOKEN?: string;
   DEV_SKIP_ACCESS?: string;
 }

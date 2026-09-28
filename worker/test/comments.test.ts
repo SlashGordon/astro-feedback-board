@@ -84,6 +84,17 @@ describe("reactions", () => {
     expect((await listComments(db, site, "/blog/other", "a", null)).reactions).toEqual({ counts: zero, mine: [] });
   });
 
+  it("count each reaction once per IP, whatever the token", async () => {
+    const site = await insertSite(db);
+    await toggleReaction(db, site.id, "/a", "a", "like", "ip-1");
+    await expect(toggleReaction(db, site.id, "/a", "b", "like", "ip-1")).rejects.toThrow("already_reacted");
+    // Other reactions, other articles and other IPs are fine, and the owner can still take it back.
+    await toggleReaction(db, site.id, "/a", "b", "fire", "ip-1");
+    await toggleReaction(db, site.id, "/b", "b", "like", "ip-1");
+    await toggleReaction(db, site.id, "/a", "c", "like", "ip-2");
+    expect(await toggleReaction(db, site.id, "/a", "a", "like", "ip-1")).toMatchObject({ counts: { like: 1, fire: 1 } });
+  });
+
   it("reject unknown reactions in the database too", async () => {
     const site = await insertSite(db);
     // @ts-expect-error: not a reaction

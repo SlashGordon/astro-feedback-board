@@ -67,6 +67,14 @@ export function errorMessage(code: string | undefined, t: Strings): string {
       return t.errorNicknamePhone;
     case "rate_limited":
       return t.errorRateLimited;
+    case "daily_limit":
+      return t.errorDailyLimit;
+    case "too_many_pending":
+      return t.errorTooManyPending;
+    case "already_reacted":
+      return t.errorAlreadyReacted;
+    case "site_paused":
+      return t.errorPaused;
     default:
       return t.errorGeneric;
   }

@@ -18,7 +18,8 @@
     { "name": "POST_LIMITER", "namespace_id": "1001", "simple": { "limit": 2, "period": 60 } },
     { "name": "VOTE_LIMITER", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } }
   ],
-  // Daily cleanup: rejected/spam posts older than 30 days, used ALTCHA challenges.
+  // Daily cleanup: rejected/spam posts older than 30 days, used ALTCHA challenges,
+  // IP hashes older than two days.
   "triggers": { "crons": ["17 3 * * *"] },
   "vars": {
     // Cloudflare Access: team domain (https://<team>.cloudflareaccess.com) and application AUD tag.
@@ -30,7 +31,12 @@
     "DEFAULT_MODERATE_REPLIES": "all",
     "DEFAULT_MODERATE_COMMENTS": "all",
     "DEFAULT_AUTO_TRUST_AFTER": "0",
-    "DEFAULT_AUTO_TRUST_DAYS": "30"
+    "DEFAULT_AUTO_TRUST_DAYS": "30",
+    // ntfy topic for a push on every new post, for example "https://ntfy.sh/<long-random-topic>".
+    // Empty: no notifications. The push carries site, kind and a link to the admin panel.
+    "NTFY_URL": "",
+    // "true" also sends the post text to the ntfy server.
+    "NTFY_INCLUDE_TEXT": "false"
   }
-  // Secrets (wrangler secret put): ALTCHA_HMAC_KEY, IP_SALT_SECRET
+  // Secrets (wrangler secret put): ALTCHA_HMAC_KEY, optionally NTFY_TOKEN
 }

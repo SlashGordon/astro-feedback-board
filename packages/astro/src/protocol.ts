@@ -119,8 +119,8 @@ export interface PublicPost {
   kind?: Kind;
   body: string;
   nickname: string | null;
-  /** Short, stable suffix for anonymous names ("Anonym #a3f"). */
-  tag: string;
+  /** Stable name of the author's device on this site ("Lunar Otter 42"), shown without a nickname. */
+  callsign: string | null;
   is_team: boolean;
   topic_status: TopicStatus | null;
   page_url: string | null;
@@ -226,6 +226,10 @@ export type ErrorCode =
   | ContentError
   | NicknameError
   | "rate_limited"
+  | "daily_limit"
+  | "too_many_pending"
+  | "already_reacted"
+  | "site_paused"
   | "invalid_kind"
   | "invalid_article"
   | "invalid_reaction"

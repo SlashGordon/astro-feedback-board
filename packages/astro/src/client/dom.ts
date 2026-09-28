@@ -32,16 +32,16 @@ export function avatar(name: string, team: boolean): HTMLElement {
   if (team) return h("span", { class: "afb-avatar afb-avatar--team", "aria-hidden": "true" }, svg("check"));
   let hash = 0;
   for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-  const initials = name.startsWith("#") ? "#" : name.trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  const initials = name.trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
   const el = h("span", { class: "afb-avatar", "aria-hidden": "true" }, initials);
   el.style.background = `hsl(${hash % 360} 55% 42%)`;
   return el;
 }
 
-/** Nickname, "Team", or "Anonym #a3f". */
-export function displayName(t: Strings, post: Pick<PublicPost, "is_team" | "nickname" | "tag">): string {
+/** Nickname, "Team", the callsign ("Lunar Otter 42") or "Anonym". */
+export function displayName(t: Strings, post: Pick<PublicPost, "is_team" | "nickname" | "callsign">): string {
   if (post.is_team) return post.nickname || t.team;
-  return post.nickname || `${t.anonymous} #${post.tag}`;
+  return post.nickname || post.callsign || t.anonymous;
 }
 
 export function stringsOf(el: HTMLElement): Strings {

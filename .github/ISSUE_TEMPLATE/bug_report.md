@@ -5,7 +5,7 @@ labels: bug
 ---
 
 **Describe the bug**
-A clear and concise description of what happens.
+What happens?
 
 **Reproduction**
 Ideally a link to a minimal repo or a StackBlitz. Otherwise:

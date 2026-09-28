@@ -3,7 +3,9 @@ import { handleAdminApi } from "./admin/api";
 import { adminHtml } from "./admin/ui";
 import { deleteExpiredChallenges } from "./altcha";
 import type { Env } from "./env";
-import { purgeRejected } from "./posts";
+import { deleteOldSalts } from "./ip";
+import { forgetReactionIpHashes } from "./comments";
+import { forgetPostIpHashes, purgeRejected } from "./posts";
 import { publicRoutes } from "./public";
 import { router } from "./router";
 import { corsHeaders, isKnownOrigin } from "./sites";
@@ -11,10 +13,11 @@ import { deleteExpiredTrust } from "./trust";
 import { error, HttpError } from "./util";
 
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+const IP_HASH_RETENTION_MS = 2 * 24 * 60 * 60 * 1000;
 
 const routePublic = router(publicRoutes);
 
-async function handle(request: Request, env: Env): Promise<Response> {
+async function handle(request: Request, env: Env, waitUntil: (promise: Promise<unknown>) => void): Promise<Response> {
   const url = new URL(request.url);
 
   if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) {
@@ -39,7 +42,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     let response: Response;
     try {
-      response = await routePublic(request, env, url);
+      response = await routePublic(request, env, url, url.pathname, waitUntil);
     } catch (e) {
       response = toErrorResponse(e);
     }
@@ -58,9 +61,9 @@ function toErrorResponse(e: unknown): Response {
 }
 
 export default {
-  async fetch(request, env): Promise<Response> {
+  async fetch(request, env, ctx): Promise<Response> {
     try {
-      return await handle(request, env);
+      return await handle(request, env, (promise) => ctx.waitUntil(promise));
     } catch (e) {
       return toErrorResponse(e);
     }
@@ -71,5 +74,8 @@ export default {
     await purgeRejected(env.DB, now - RETENTION_MS);
     await deleteExpiredChallenges(env.DB, now);
     await deleteExpiredTrust(env.DB, now);
+    await forgetPostIpHashes(env.DB, now - IP_HASH_RETENTION_MS);
+    await forgetReactionIpHashes(env.DB, now - IP_HASH_RETENTION_MS);
+    await deleteOldSalts(env.DB, new Date(now));
   },
 } satisfies ExportedHandler<Env>;

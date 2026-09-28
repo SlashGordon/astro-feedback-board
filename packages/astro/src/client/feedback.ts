@@ -195,6 +195,25 @@ function watchBadges(): void {
   }
 }
 
+/** Deletes the device's data on the Worker and in localStorage, after asking. */
+async function forget(form: HTMLFormElement, button: HTMLButtonElement): Promise<void> {
+  const t = stringsOf(form);
+  if (!window.confirm(t.forgetConfirm)) return;
+  button.disabled = true;
+  try {
+    await visitor.forget(form.dataset.endpoint ?? "");
+    for (const field of document.querySelectorAll<HTMLInputElement>("form[data-afb-form] input[name=nickname]")) {
+      field.value = "";
+    }
+    syncAll();
+    setStatus(form, "success", t.forgotten);
+  } catch (error) {
+    setStatus(form, "error", errorMessage(error instanceof ApiError ? error.code : undefined, t));
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function syncAll(): void {
   document.querySelectorAll<HTMLFormElement>("form[data-afb-form]").forEach(syncRemembered);
   watchBadges();
@@ -212,6 +231,12 @@ export function initFeedback(): void {
   document.addEventListener("focusin", (event) => {
     const form = formOf(event.target);
     if (form) stateOf(form).solver.prepare();
+  });
+
+  document.addEventListener("click", (event) => {
+    const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>("[data-afb-forget]") : null;
+    const form = button && formOf(button);
+    if (form) void forget(form, button);
   });
 
   document.addEventListener("submit", (event) => {

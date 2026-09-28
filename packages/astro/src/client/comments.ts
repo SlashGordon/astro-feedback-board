@@ -114,7 +114,7 @@ class Comments {
     return h(
       "li",
       { class: `afb-reply${post.is_team ? " afb-reply--team" : ""}` },
-      avatar(post.nickname ? name : `#${post.tag}`, post.is_team),
+      avatar(name, post.is_team),
       h(
         "div",
         { class: "afb-comment-main" },

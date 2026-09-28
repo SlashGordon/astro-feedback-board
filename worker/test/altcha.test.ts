@@ -1,18 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { type Challenge, MIN_FILL_MS } from "astro-feedback-board/protocol";
+import { MIN_FILL_MS } from "astro-feedback-board/protocol";
 import { CHALLENGE_TTL_MS, createChallenge, verifySolution } from "../src/altcha";
-import { sha256 } from "../src/util";
+import { solve } from "./solve";
 
 const KEY = "test-key";
-
-async function solve(c: Challenge): Promise<string> {
-  for (let n = 0; n <= c.maxnumber; n++) {
-    if ((await sha256(c.salt + n)) === c.challenge) {
-      return btoa(JSON.stringify({ algorithm: c.algorithm, challenge: c.challenge, number: n, salt: c.salt, signature: c.signature }));
-    }
-  }
-  throw new Error("unsolvable");
-}
 
 describe("altcha", () => {
   it("accepts a solved challenge after the minimum fill time", async () => {

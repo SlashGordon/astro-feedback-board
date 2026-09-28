@@ -10,24 +10,28 @@ import {
   isTopicStatus,
   type ReactionRequest,
   type SubmitRequest,
-  type SubmitResponse,
 } from "astro-feedback-board/protocol";
 import { consumeChallenge, createChallenge, verifySolution } from "./altcha";
 import { getThread, listFeedback, toggleVote, visitorPosts } from "./board";
 import { listComments, reactionSummary, toggleReaction } from "./comments";
 import { normalizeContext, normalizeNickname, normalizePageUrl } from "./content";
 import type { Env } from "./env";
-import { deleteOwnPost, type Draft, submitPost } from "./posts";
-import { route } from "./router";
+import { notifyNewPost } from "./notify";
+import { deleteOwnPost, type Draft, type FeedbackRef, forgetDevice, submitPost } from "./posts";
+import { type RequestContext, route } from "./router";
 import { getSite, type Site, siteOrigins } from "./sites";
-import { authorHash, dailyIpHash, HttpError, json, newId, readJson, sha256 } from "./util";
+import { dailyIpHash } from "./ip";
+import { authorHash, HttpError, json, newId, readJson, sha256 } from "./util";
 
 type Untrusted<T> = { [K in keyof T]?: unknown };
+type WriteContext = RequestContext & { site: Site };
 
-/** One vote per post per device and day: author token combined with the daily IP hash. */
+/**
+ * One vote per post per IP and day. The device token is left out on purpose:
+ * a script could send a new one with every request.
+ */
 async function voterHash(request: Request, env: Env, ipHash?: string): Promise<string> {
-  const ip = ipHash ?? (await dailyIpHash(request, env.IP_SALT_SECRET));
-  return sha256(`vote:${(await authorHash(request)) ?? ""}:${ip}`);
+  return sha256(`vote:${ipHash ?? (await dailyIpHash(request, env.DB))}`);
 }
 
 /**
@@ -36,8 +40,12 @@ async function voterHash(request: Request, env: Env, ipHash?: string): Promise<s
  */
 async function reactorHash(request: Request, env: Env, ipHash?: string): Promise<string> {
   const author = await authorHash(request);
-  if (author) return sha256(`rate:${author}`);
-  return sha256(`rate:ip:${ipHash ?? (await dailyIpHash(request, env.IP_SALT_SECRET))}`);
+  if (author) return deviceReactorHash(author);
+  return sha256(`rate:ip:${ipHash ?? (await dailyIpHash(request, env.DB))}`);
+}
+
+function deviceReactorHash(author: string): Promise<string> {
+  return sha256(`rate:${author}`);
 }
 
 /** Spam layer 1: humans never see the honeypot field, bots fill it. */
@@ -69,6 +77,7 @@ async function readDraft(
   request: Request,
   env: Env,
   site: Site,
+  ipHash: string,
   { comment = false }: { comment?: boolean } = {},
 ): Promise<Draft | null> {
   const input = await readJson<Untrusted<SubmitRequest>>(request);
@@ -92,10 +101,17 @@ async function readDraft(
     nickname,
     pageUrl: normalizePageUrl(input.page_url, siteOrigins(site)),
     context: normalizeContext(input.context),
+    ipHash,
   };
 }
 
-function submitted(result: SubmitResponse): Response {
+/** Stores the post and pushes a notification without holding up the response. */
+async function store(ctx: WriteContext, parent: FeedbackRef | null, draft: Draft | null): Promise<Response> {
+  // A bot that filled the honeypot gets a fake success and nothing is stored.
+  const result = draft
+    ? await submitPost(ctx.env.DB, ctx.site, parent, draft, await authorHash(ctx.request))
+    : { id: newId(), status: "pending" as const };
+  if (draft) ctx.waitUntil(notifyNewPost(ctx.env, ctx.site, parent, draft, result.status, ctx.url));
   return json(result, { status: 201 });
 }
 
@@ -117,11 +133,9 @@ export const publicRoutes = [
     );
   }),
 
-  route("POST", "/v1/sites/:site/feedback", { target: "site", write: "POST_LIMITER" }, async ({ request, env, site }) => {
-    const draft = await readDraft(request, env, site);
-    if (!draft) return submitted({ id: newId(), status: "pending" });
-    return submitted(await submitPost(env.DB, site, null, draft, await authorHash(request)));
-  }),
+  route("POST", "/v1/sites/:site/feedback", { target: "site", write: "POST_LIMITER" }, async (ctx) =>
+    store(ctx, null, await readDraft(ctx.request, ctx.env, ctx.site, ctx.ipHash)),
+  ),
 
   route("GET", "/v1/sites/:site/comments", { target: "site" }, async ({ request, env, url, site }) =>
     json(
@@ -135,11 +149,9 @@ export const publicRoutes = [
     ),
   ),
 
-  route("POST", "/v1/sites/:site/comments", { target: "site", write: "POST_LIMITER" }, async ({ request, env, site }) => {
-    const draft = await readDraft(request, env, site, { comment: true });
-    if (!draft) return submitted({ id: newId(), status: "pending" });
-    return submitted(await submitPost(env.DB, site, null, draft, await authorHash(request)));
-  }),
+  route("POST", "/v1/sites/:site/comments", { target: "site", write: "POST_LIMITER" }, async (ctx) =>
+    store(ctx, null, await readDraft(ctx.request, ctx.env, ctx.site, ctx.ipHash, { comment: true })),
+  ),
 
   route("POST", "/v1/sites/:site/reactions", { target: "site", write: "VOTE_LIMITER" }, async ({ request, env, site, ipHash }) => {
     const input = await readJson<Untrusted<ReactionRequest>>(request);
@@ -149,7 +161,7 @@ export const publicRoutes = [
     if (filledHoneypot(input)) return json(await reactionSummary(env.DB, site.id, article, voter));
     if (!isReaction(input.reaction)) throw new HttpError(422, "invalid_reaction");
     await verifyAltcha(env, input.altcha);
-    return json(await toggleReaction(env.DB, site.id, article, voter, input.reaction));
+    return json(await toggleReaction(env.DB, site.id, article, voter, input.reaction, ipHash));
   }),
 
   route("GET", "/v1/feedback/:id", {}, async ({ request, env, params }) =>
@@ -160,11 +172,7 @@ export const publicRoutes = [
     "POST",
     "/v1/feedback/:id/replies",
     { target: "feedback", write: "POST_LIMITER" },
-    async ({ request, env, site, feedback }) => {
-      const draft = await readDraft(request, env, site);
-      if (!draft) return submitted({ id: newId(), status: "pending" });
-      return submitted(await submitPost(env.DB, site, feedback, draft, await authorHash(request)));
-    },
+    async (ctx) => store(ctx, ctx.feedback, await readDraft(ctx.request, ctx.env, ctx.site, ctx.ipHash)),
   ),
 
   route(
@@ -180,6 +188,13 @@ export const publicRoutes = [
     if (!author) throw new HttpError(401, "token_required");
     const site = await getSite(env.DB, url.searchParams.get("site") ?? "");
     return json(await visitorPosts(env.DB, site.id, author));
+  }),
+
+  route("DELETE", "/v1/me", {}, async ({ request, env }) => {
+    const author = await authorHash(request);
+    if (!author) throw new HttpError(401, "token_required");
+    await forgetDevice(env.DB, author, await deviceReactorHash(author));
+    return new Response(null, { status: 204 });
   }),
 
   route("DELETE", "/v1/posts/:id", {}, async ({ request, env, params }) => {

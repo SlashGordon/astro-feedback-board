@@ -1,4 +1,3 @@
 ALTCHA_HMAC_KEY=dev-altcha-key-change-me
-IP_SALT_SECRET=dev-ip-salt-change-me
 # Skips the Cloudflare Access check for /admin. Only for local development.
 DEV_SKIP_ACCESS=true

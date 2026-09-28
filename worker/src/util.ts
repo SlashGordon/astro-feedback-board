@@ -71,10 +71,3 @@ export async function authorHash(request: Request): Promise<string | null> {
   return sha256(`author:${token}`);
 }
 
-/** sha256(ip + daily salt). Used as rate-limit key only, never stored. */
-export async function dailyIpHash(request: Request, secret: string, date = new Date()): Promise<string> {
-  const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
-  const day = date.toISOString().slice(0, 10);
-  const salt = await hmacSha256(secret, day);
-  return sha256(ip + salt);
-}

@@ -18,7 +18,7 @@ interface Props extends SharedProps {
   article?: string;
 }
 
-const { site, endpoint, lang, context, strings: overrides, question, kind, reply = false, article } = Astro.props;
+const { site, endpoint, lang, context, privacyUrl, strings: overrides, question, kind, reply = false, article } = Astro.props;
 const t = resolveStrings(lang, overrides);
 const uid = `afb-${Math.random().toString(36).slice(2, 9)}`;
 const labels = kindLabels(t);
@@ -92,17 +92,23 @@ const fixedKind = !reply && !article ? kind : undefined;
   </div>
 
   <label class="afb-check" data-afb-remember>
-    <input type="checkbox" name="remember" checked />
+    <input type="checkbox" name="remember" />
     <span>{t.remember}</span>
   </label>
   <p class="afb-hint" data-afb-remembered hidden>
     <Fragment set:html={icon("checkCircle")} />
-    {t.remembered}
+    <span>
+      {t.remembered}
+      <button type="button" class="afb-link-button" data-afb-forget>{t.forgetDevice}</button>
+    </span>
   </p>
 
   <p class="afb-hint">
     <Fragment set:html={icon("lock")} />
-    {t.privacyHint}
+    <span>
+      {t.privacyHint}
+      {privacyUrl && <a class="afb-privacy-link" href={privacyUrl}>{t.privacyLink}</a>}
+    </span>
   </p>
 
   <div class="afb-actions">

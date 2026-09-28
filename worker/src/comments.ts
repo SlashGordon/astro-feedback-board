@@ -3,6 +3,7 @@ import { type CommentsResponse, type Reaction, REACTIONS, type ReactionSummary }
 import { publicPost } from "./board";
 import type { PostRow } from "./posts";
 import type { Site } from "./sites";
+import { HttpError } from "./util";
 
 /**
  * Approved comments on an article with their approved replies, oldest first,
@@ -66,13 +67,18 @@ export async function reactionSummary(
   return { counts, mine: REACTIONS.filter((r) => results.some((row) => row.reaction === r && row.mine === 1)) };
 }
 
-/** Sets the voter's reaction, or removes it if it was set. */
+/**
+ * Sets the voter's reaction, or removes it if it was set. Each IP sets each
+ * reaction on an article once per day, so rotating the device token does not
+ * add reactions.
+ */
 export async function toggleReaction(
   db: D1Database,
   siteId: string,
   article: string,
   voter: string,
   reaction: Reaction,
+  ipHash: string | null = null,
   now = Date.now(),
 ): Promise<ReactionSummary> {
   const removed = await db
@@ -80,10 +86,22 @@ export async function toggleReaction(
     .bind(siteId, article, voter, reaction)
     .run();
   if (removed.meta.changes === 0) {
+    if (ipHash) {
+      const taken = await db
+        .prepare("SELECT 1 FROM reactions WHERE site_id = ? AND article = ? AND reaction = ? AND ip_hash = ?")
+        .bind(siteId, article, reaction, ipHash)
+        .first();
+      if (taken) throw new HttpError(429, "already_reacted");
+    }
     await db
-      .prepare("INSERT INTO reactions (site_id, article, voter_hash, reaction, created_at) VALUES (?, ?, ?, ?, ?)")
-      .bind(siteId, article, voter, reaction, now)
+      .prepare("INSERT INTO reactions (site_id, article, voter_hash, reaction, created_at, ip_hash) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(siteId, article, voter, reaction, now, ipHash)
       .run();
   }
   return reactionSummary(db, siteId, article, voter);
+}
+
+/** Retention: IP hashes are only needed for the one-reaction-per-IP rule. */
+export async function forgetReactionIpHashes(db: D1Database, cutoff: number): Promise<void> {
+  await db.prepare("UPDATE reactions SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND created_at < ?").bind(cutoff).run();
 }

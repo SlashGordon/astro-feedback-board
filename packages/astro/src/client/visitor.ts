@@ -9,9 +9,10 @@
 import type { MeResponse } from "../protocol";
 import { api } from "./api";
 
-const TOKEN_KEY = "afb:token";
-const NICKNAME_KEY = "afb:nickname";
-const SNOOZE_PREFIX = "afb:snooze:";
+const PREFIX = "afb:";
+const TOKEN_KEY = `${PREFIX}token`;
+const NICKNAME_KEY = `${PREFIX}nickname`;
+const SNOOZE_PREFIX = `${PREFIX}snooze:`;
 
 type Listener = (me: MeResponse) => void;
 
@@ -113,6 +114,27 @@ export function createVisitor(storage: () => Storage | null = browserStorage) {
     /** Loads the visitor's posts again, for example after a submit, delete or opened thread. */
     refresh(endpoint: string, site: string): Promise<void> {
       return load(endpoint, site, entryFor(endpoint, site));
+    },
+
+    /**
+     * Deletes everything the Worker holds for this device (posts, reactions,
+     * callsign), then every afb: key in localStorage. Watchers get an empty list.
+     */
+    async forget(endpoint: string): Promise<void> {
+      const token = read(TOKEN_KEY);
+      if (token) await api<null>(endpoint, "/v1/me", { method: "DELETE", token });
+      try {
+        const store = storage();
+        const keys = store ? Array.from({ length: store.length }, (_, i) => store.key(i)) : [];
+        for (const key of keys) if (key?.startsWith(PREFIX)) store?.removeItem(key);
+      } catch {
+        // Storage blocked: nothing was stored either.
+      }
+      const empty: MeResponse = { posts: [], unseen: 0 };
+      for (const entry of entries.values()) {
+        entry.value = empty;
+        for (const listener of entry.listeners) listener(empty);
+      }
     },
 
     /** Forgets all watchers and cached data. Called when a view transition swaps the page. */

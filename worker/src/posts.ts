@@ -13,6 +13,7 @@ import type {
   SubmitResponse,
   TopicStatus,
 } from "astro-feedback-board/protocol";
+import { callsignNumber } from "./callsign";
 import { getSite, type Site } from "./sites";
 import { grantTrust, isTrusted, revokeStatement, type TrustKey } from "./trust";
 import { HttpError, newId } from "./util";
@@ -29,12 +30,16 @@ export interface PostRow {
   body: string;
   nickname: string | null;
   author_hash: string | null;
+  /** The device's callsign number on the site, NULL for team posts and posts without a token. */
+  author_seq: number | null;
   is_team: number;
   status: PostStatus;
   topic_status: TopicStatus | null;
   context: string | null;
   created_at: number;
   approved_at: number | null;
+  /** Daily IP hash of the writer for the post caps, cleared after two days. */
+  ip_hash: string | null;
 }
 
 /** A top-level post (feedback or comment) that replies, votes and team replies attach to. */
@@ -75,6 +80,29 @@ export interface Draft {
   nickname: string | null;
   pageUrl: string | null;
   context: string | null;
+  /** Daily IP hash of the writer. Counts toward the per-IP caps. */
+  ipHash?: string;
+}
+
+/** Posts per IP and UTC day, whatever became of them. Trusted devices are exempt. */
+export const DAILY_POSTS_PER_IP = 10;
+/** Posts waiting in the queue per device or IP, across sites. Trusted devices are exempt. */
+export const PENDING_PER_AUTHOR = 3;
+
+/**
+ * Caps that do not rely on the device token alone: a script can drop or
+ * rotate it, but not its IP within a day.
+ */
+async function assertPostLimits(db: D1Database, author: string | null, ipHash: string | null, pending: boolean): Promise<void> {
+  const counts = await db
+    .prepare(
+      `SELECT (SELECT COUNT(*) FROM posts WHERE ip_hash = ?2) AS today,
+              (SELECT COUNT(*) FROM posts WHERE status = 'pending' AND (author_hash = ?1 OR ip_hash = ?2)) AS pending`,
+    )
+    .bind(author, ipHash)
+    .first<{ today: number; pending: number }>();
+  if (counts && counts.today >= DAILY_POSTS_PER_IP) throw new HttpError(429, "daily_limit");
+  if (pending && counts && counts.pending >= PENDING_PER_AUTHOR) throw new HttpError(429, "too_many_pending");
 }
 
 /** Stores a visitor's feedback, comment (draft.article, no parent) or reply. */
@@ -88,7 +116,10 @@ export async function submitPost(
 ): Promise<SubmitResponse> {
   const article = parent ? null : (draft.article ?? null);
   const mode = parent ? site.moderate_replies : article ? site.moderate_comments : site.moderate_feedback;
-  const status = initialStatus(mode, await isTrusted(db, author, site.id, now));
+  const trusted = await isTrusted(db, author, site.id, now);
+  const status = initialStatus(mode, trusted);
+  const ipHash = draft.ipHash ?? null;
+  if (!trusted) await assertPostLimits(db, author, ipHash, status === "pending");
   const id = newId();
   await insert(db, {
     id,
@@ -100,12 +131,14 @@ export async function submitPost(
     body: draft.body,
     nickname: draft.nickname,
     author_hash: author,
+    author_seq: author ? await callsignNumber(db, site.id, author) : null,
     is_team: 0,
     status,
     topic_status: parent || article ? null : "open",
     context: draft.context,
     created_at: now,
     approved_at: status === "approved" ? now : null,
+    ip_hash: ipHash,
   });
   return { id, status };
 }
@@ -129,12 +162,14 @@ export async function createTeamReply(
     body,
     nickname: teamName,
     author_hash: null,
+    author_seq: null,
     is_team: 1,
     status: "approved",
     topic_status: null,
     context: null,
     created_at: now,
     approved_at: now,
+    ip_hash: null,
   });
   return { id, status: "approved" };
 }
@@ -142,9 +177,9 @@ export async function createTeamReply(
 async function insert(db: D1Database, row: PostRow): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO posts (id, site_id, parent_id, kind, article, page_url, body, nickname, author_hash, is_team, status,
-                          topic_status, context, created_at, approved_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO posts (id, site_id, parent_id, kind, article, page_url, body, nickname, author_hash, author_seq, is_team,
+                          status, topic_status, context, created_at, approved_at, ip_hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       row.id,
@@ -156,12 +191,14 @@ async function insert(db: D1Database, row: PostRow): Promise<void> {
       row.body,
       row.nickname,
       row.author_hash,
+      row.author_seq,
       row.is_team,
       row.status,
       row.topic_status,
       row.context,
       row.created_at,
       row.approved_at,
+      row.ip_hash,
     )
     .run();
 }
@@ -277,6 +314,26 @@ export async function deleteOwnPost(db: D1Database, id: string, author: string):
   if (!post) throw new HttpError(404, "post_not_found");
   if (post.author_hash !== author) throw new HttpError(403, "not_your_post");
   await deletePost(db, id);
+}
+
+/**
+ * GDPR Art. 17 for a whole device: its posts (with the replies under them),
+ * reactions, reply-badge state, callsign and trust. Votes are keyed by the
+ * daily IP hash and cannot be tied to the device.
+ */
+export async function forgetDevice(db: D1Database, author: string, reactor: string): Promise<void> {
+  await db.batch([
+    db.prepare("DELETE FROM posts WHERE author_hash = ?").bind(author),
+    db.prepare("DELETE FROM seen WHERE author_hash = ?").bind(author),
+    db.prepare("DELETE FROM reactions WHERE voter_hash = ?").bind(reactor),
+    db.prepare("DELETE FROM callsigns WHERE author_hash = ?").bind(author),
+    db.prepare("DELETE FROM trust WHERE author_hash = ?").bind(author),
+  ]);
+}
+
+/** Retention: IP hashes are only needed for the daily caps. */
+export async function forgetPostIpHashes(db: D1Database, cutoff: number): Promise<void> {
+  await db.prepare("UPDATE posts SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND created_at < ?").bind(cutoff).run();
 }
 
 /** Retention: deletes rejected and spam posts created before the cutoff. */
