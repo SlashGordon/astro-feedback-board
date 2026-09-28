@@ -17,17 +17,17 @@ export interface Solution {
   signature: string;
 }
 
-export async function createChallenge(key: string, at = Date.now()): Promise<Challenge> {
+export async function createChallenge(key: string, at = Date.now(), maxNumber = MAX_NUMBER): Promise<Challenge> {
   const random = [...crypto.getRandomValues(new Uint8Array(12))]
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
   const salt = `${random}?issued=${at}&expires=${at + CHALLENGE_TTL_MS}`;
-  const number = crypto.getRandomValues(new Uint32Array(1))[0] % MAX_NUMBER;
+  const number = crypto.getRandomValues(new Uint32Array(1))[0] % maxNumber;
   const challenge = await sha256(salt + number);
   return {
     algorithm: "SHA-256",
     challenge,
-    maxnumber: MAX_NUMBER,
+    maxnumber: maxNumber,
     salt,
     signature: await hmacSha256(key, challenge),
   };

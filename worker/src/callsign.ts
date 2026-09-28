@@ -70,9 +70,12 @@ function feistel(value: number, keys: number[]): number {
   return (left << HALF_BITS) | right;
 }
 
+let cachedKeys: { siteId: string; keys: number[] } | undefined;
+
 /** A bijection on [0, CALLSIGN_SLOTS) that looks random and differs per site. */
 export function shuffleSlot(slot: number, siteId: string): number {
-  const keys = roundKeys(siteId);
+  if (cachedKeys?.siteId !== siteId) cachedKeys = { siteId, keys: roundKeys(siteId) };
+  const keys = cachedKeys.keys;
   let value = slot;
   do value = feistel(value, keys);
   while (value >= CALLSIGN_SLOTS);

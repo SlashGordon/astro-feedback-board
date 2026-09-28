@@ -96,6 +96,8 @@ export function testEnv(db: D1Database, limits: { post?: boolean; vote?: boolean
     DEFAULT_AUTO_TRUST_AFTER: "0",
     DEFAULT_AUTO_TRUST_DAYS: "30",
     ALTCHA_HMAC_KEY: "test-altcha-key",
+    // Real difficulty would make every test solve ~125,000 hashes per challenge.
+    ALTCHA_MAX_NUMBER: "1000",
     NTFY_URL: "",
   };
 }

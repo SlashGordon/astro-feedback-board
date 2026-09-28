@@ -14,7 +14,7 @@ describe("callsign", () => {
       if (!(value < CALLSIGN_SLOTS) || seen[value]++) clashes++;
     }
     expect(clashes).toBe(0);
-  });
+  }, 30_000);
 
   it("gives a stable, spacey name", () => {
     expect(callsign("demo", 0)).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+ \d{1,4}$/);

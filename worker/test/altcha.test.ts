@@ -4,30 +4,32 @@ import { CHALLENGE_TTL_MS, createChallenge, verifySolution } from "../src/altcha
 import { solve } from "./solve";
 
 const KEY = "test-key";
+/** Low difficulty keeps the tests fast; the check does not depend on it. */
+const EASY = 1000;
 
 describe("altcha", () => {
   it("accepts a solved challenge after the minimum fill time", async () => {
     const issued = Date.now();
-    const payload = await solve(await createChallenge(KEY, issued));
+    const payload = await solve(await createChallenge(KEY, issued, EASY));
     const result = await verifySolution(KEY, payload, issued + MIN_FILL_MS);
     expect(result.ok).toBe(true);
   });
 
   it("rejects submissions faster than the minimum fill time", async () => {
     const issued = Date.now();
-    const payload = await solve(await createChallenge(KEY, issued));
+    const payload = await solve(await createChallenge(KEY, issued, EASY));
     expect(await verifySolution(KEY, payload, issued + 500)).toEqual({ ok: false, reason: "too_fast" });
   });
 
   it("rejects expired challenges", async () => {
     const issued = Date.now();
-    const payload = await solve(await createChallenge(KEY, issued));
+    const payload = await solve(await createChallenge(KEY, issued, EASY));
     expect(await verifySolution(KEY, payload, issued + CHALLENGE_TTL_MS + 1)).toEqual({ ok: false, reason: "expired" });
   });
 
   it("rejects a wrong number, a foreign key and a forged issue time", async () => {
     const issued = Date.now();
-    const c = await createChallenge(KEY, issued);
+    const c = await createChallenge(KEY, issued, EASY);
     const payload = await solve(c);
     const decoded = JSON.parse(atob(payload));
 

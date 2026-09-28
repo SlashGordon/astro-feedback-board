@@ -11,6 +11,8 @@ export interface Env {
   DEFAULT_AUTO_TRUST_AFTER: string;
   DEFAULT_AUTO_TRUST_DAYS: string;
   ALTCHA_HMAC_KEY: string;
+  /** Proof-of-work difficulty. Default 250000; the tests lower it. */
+  ALTCHA_MAX_NUMBER?: string;
   /** ntfy topic URL for new posts, for example https://ntfy.sh/my-feedback. Empty: no notifications. */
   NTFY_URL: string;
   /** "true" puts the post text into the notification. Default: title and link only. */

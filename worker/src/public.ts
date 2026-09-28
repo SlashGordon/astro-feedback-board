@@ -118,7 +118,9 @@ async function store(ctx: WriteContext, parent: FeedbackRef | null, draft: Draft
 
 export const publicRoutes = [
   route("GET", "/v1/challenge", {}, async ({ env }) =>
-    json(await createChallenge(env.ALTCHA_HMAC_KEY), { headers: { "cache-control": "no-store" } }),
+    json(await createChallenge(env.ALTCHA_HMAC_KEY, Date.now(), Number(env.ALTCHA_MAX_NUMBER) || undefined), {
+      headers: { "cache-control": "no-store" },
+    }),
   ),
 
   route("GET", "/v1/sites/:site/feedback", { target: "site" }, async ({ request, env, url, site }) => {
