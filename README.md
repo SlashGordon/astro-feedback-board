@@ -41,13 +41,14 @@ Open the demo under `localhost:4321`. The Worker only accepts posts from origins
 
 ## Deploying the Worker
 
-1. `npx wrangler d1 create feedback --jurisdiction eu` and put the database id into `worker/wrangler.jsonc`. The jurisdiction keeps the stored data in the EU.
-2. Change the route in `wrangler.jsonc` to your own domain.
-3. `npm --workspace worker run db:migrate:remote`
-4. Set the secret: `npx wrangler secret put ALTCHA_HMAC_KEY` (a long random string).
-5. Optional: set `NTFY_URL` in `wrangler.jsonc` to an ntfy topic (`https://ntfy.sh/<long-random-topic>`) to get a push for every new post, and `npx wrangler secret put NTFY_TOKEN` if the topic needs a token. The push contains the site, the kind and a link to the admin panel. The post text is only included with `NTFY_INCLUDE_TEXT` set to `"true"`, because it then goes to the ntfy server.
-6. Create a Cloudflare Access application for `<your-domain>/admin*` and set `ACCESS_TEAM_DOMAIN` (`https://<team>.cloudflareaccess.com`) and `ACCESS_AUD` in `wrangler.jsonc`. The Worker checks the Access JWT itself and answers 403 without it.
-7. `npm --workspace worker run deploy`
+[docs/deploy.md](docs/deploy.md) walks through the setup step by step. In short:
+
+1. Copy `worker/wrangler.jsonc` to a gitignored `worker/wrangler.prod.jsonc` and pass `-c wrangler.prod.jsonc` to every wrangler command.
+2. Create the D1 database with `--jurisdiction eu`, put its ID into the config and apply the migrations.
+3. Deploy and set the secret `ALTCHA_HMAC_KEY`.
+4. Protect `/admin*` with Cloudflare Access and set `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD`.
+5. Register your site and its origins in the admin panel.
+6. Optional: set `NTFY_URL` for a push on every new post.
 
 ## Using the components
 
