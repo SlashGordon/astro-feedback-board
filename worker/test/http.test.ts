@@ -172,16 +172,33 @@ describe("comments and reactions", () => {
 });
 
 describe("abuse limits", () => {
-  it("counts one vote per IP, however often the token changes", async () => {
+  it("counts one vote per IP and day, however often the token changes", async () => {
     const site = await insertSite(db, { moderate_feedback: "none" });
     const { id } = await (
       await post(`/v1/sites/${site.id}/feedback`, { body: "Bitte einen Dark Mode einbauen", altcha: await altcha() })
     ).json<{ id: string }>();
-    const vote = (token: string, ip = "1.2.3.4") =>
-      post(`/v1/feedback/${id}/vote`, {}, { "x-author-token": token, "cf-connecting-ip": ip }).then((r) => r.json());
+    const vote = (token: string | null, ip = "1.2.3.4") =>
+      post(`/v1/feedback/${id}/vote`, {}, { ...(token ? { "x-author-token": token } : {}), "cf-connecting-ip": ip }).then(
+        (r) => r.json(),
+      );
     expect(await vote(TOKEN)).toEqual({ voted: true, votes: 1 });
-    expect(await vote("f".repeat(32))).toEqual({ voted: false, votes: 0 });
-    expect(await vote("e".repeat(32), "5.6.7.8")).toEqual({ voted: true, votes: 1 });
+    expect(await vote("f".repeat(32))).toEqual({ voted: false, votes: 1 });
+    expect(await vote(null)).toEqual({ voted: false, votes: 1 });
+    expect(await vote("e".repeat(32), "5.6.7.8")).toEqual({ voted: true, votes: 2 });
+  });
+
+  it("keeps a remembered device's vote on the next day", async () => {
+    const site = await insertSite(db, { moderate_feedback: "none" });
+    const { id } = await (
+      await post(`/v1/sites/${site.id}/feedback`, { body: "Bitte einen Dark Mode einbauen", altcha: await altcha() })
+    ).json<{ id: string }>();
+    const headers = { "x-author-token": TOKEN, "cf-connecting-ip": "1.2.3.4" };
+    expect(await (await post(`/v1/feedback/${id}/vote`, {}, headers)).json()).toEqual({ voted: true, votes: 1 });
+
+    vi.setSystemTime(Date.now() + 86_400_000);
+    const list = await (await call(`/v1/sites/${site.id}/feedback`, { headers })).json<{ feedback: { voted: boolean }[] }>();
+    expect(list.feedback[0].voted).toBe(true);
+    expect(await (await post(`/v1/feedback/${id}/vote`, {}, headers)).json()).toEqual({ voted: false, votes: 0 });
   });
 
   it("refuses every write while a site is paused", async () => {
@@ -227,21 +244,25 @@ describe("abuse limits", () => {
 });
 
 describe("privacy", () => {
-  it("forgets a device: posts, reactions, callsign and trust", async () => {
+  it("forgets a device: posts, votes, reactions, callsign and trust", async () => {
     const site = await insertSite(db, { moderate_feedback: "none" });
     const token = { "x-author-token": TOKEN };
     await post(`/v1/sites/${site.id}/feedback`, { body: "Bitte einen Dark Mode einbauen", altcha: await altcha() }, token);
     await post(`/v1/sites/${site.id}/reactions`, { article: "/a", reactions: ["like"], altcha: await altcha() }, token);
-    await post(`/v1/sites/${site.id}/feedback`, { body: "Von jemand anderem geschrieben", altcha: await altcha() }, {
-      "x-author-token": "f".repeat(32),
-      "cf-connecting-ip": "9.9.9.9",
-    });
+    const other = await (
+      await post(`/v1/sites/${site.id}/feedback`, { body: "Von jemand anderem geschrieben", altcha: await altcha() }, {
+        "x-author-token": "f".repeat(32),
+        "cf-connecting-ip": "9.9.9.9",
+      })
+    ).json<{ id: string }>();
+    await post(`/v1/feedback/${other.id}/vote`, {}, token);
 
     expect((await call("/v1/me", { method: "DELETE" })).status).toBe(401);
     expect((await call("/v1/me", { method: "DELETE", headers: token })).status).toBe(204);
 
     const count = (sql: string) => db.prepare(sql).first<number>("n");
     expect(await count("SELECT COUNT(*) AS n FROM posts")).toBe(1);
+    expect(await count("SELECT COUNT(*) AS n FROM votes")).toBe(0);
     expect(await count("SELECT COUNT(*) AS n FROM reactions")).toBe(0);
     expect(await count("SELECT COUNT(*) AS n FROM callsigns")).toBe(1);
   });

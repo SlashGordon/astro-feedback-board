@@ -28,11 +28,19 @@ type Untrusted<T> = { [K in keyof T]?: unknown };
 type WriteContext = RequestContext & { site: Site };
 
 /**
- * One vote per post per IP and day. The device token is left out on purpose:
- * a script could send a new one with every request.
+ * Vote key: the device token when there is one, so the vote stays the
+ * visitor's on later days; otherwise the daily IP hash. A script that sends a
+ * new token with every request still adds one vote per IP and day, see
+ * toggleVote.
  */
 async function voterHash(request: Request, env: Env, ipHash?: string): Promise<string> {
+  const author = await authorHash(request);
+  if (author) return deviceVoterHash(author);
   return sha256(`vote:${ipHash ?? (await dailyIpHash(request, env.DB))}`);
+}
+
+function deviceVoterHash(author: string): Promise<string> {
+  return sha256(`vote:device:${author}`);
 }
 
 /**
@@ -186,7 +194,7 @@ export const publicRoutes = [
     "/v1/feedback/:id/vote",
     { target: "feedback", write: "VOTE_LIMITER" },
     async ({ request, env, feedback, ipHash }) =>
-      json(await toggleVote(env.DB, feedback.id, await voterHash(request, env, ipHash))),
+      json(await toggleVote(env.DB, feedback.id, await voterHash(request, env, ipHash), ipHash)),
   ),
 
   route("GET", "/v1/me", {}, async ({ request, env, url }) => {
@@ -199,7 +207,7 @@ export const publicRoutes = [
   route("DELETE", "/v1/me", {}, async ({ request, env }) => {
     const author = await authorHash(request);
     if (!author) throw new HttpError(401, "token_required");
-    await forgetDevice(env.DB, author, await deviceReactorHash(author));
+    await forgetDevice(env.DB, author, await deviceReactorHash(author), await deviceVoterHash(author));
     return new Response(null, { status: 204 });
   }),
 

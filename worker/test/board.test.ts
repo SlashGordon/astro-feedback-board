@@ -47,6 +47,16 @@ describe("listFeedback", () => {
     expect(await toggleVote(db, id, "v")).toEqual({ voted: true, votes: 1 });
     expect(await toggleVote(db, id, "v")).toEqual({ voted: false, votes: 0 });
   });
+
+  it("adds one vote per IP and day, whatever the voter key", async () => {
+    const site = await insertSite(db, { moderate_feedback: "none" });
+    const { id } = await submitPost(db, site, null, draft(), alice);
+    expect(await toggleVote(db, id, "device-1", "ip-1")).toEqual({ voted: true, votes: 1 });
+    expect(await toggleVote(db, id, "device-2", "ip-1")).toEqual({ voted: false, votes: 1 });
+    // The next day brings a new IP hash; device-1 still owns its vote.
+    expect(await toggleVote(db, id, "device-2", "ip-2")).toEqual({ voted: true, votes: 2 });
+    expect(await toggleVote(db, id, "device-1", "ip-2")).toEqual({ voted: false, votes: 1 });
+  });
 });
 
 describe("reply badge", () => {

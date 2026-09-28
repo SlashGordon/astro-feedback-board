@@ -102,10 +102,10 @@ The context is stored with the post for as long as the post exists and is shown 
 
 Every form has the spam layers built in: a honeypot field that people never see, a minimum of 3 seconds between rendering and sending, and an ALTCHA proof of work that the browser solves in the background. Reactions use the same layers. The reaction buttons collect clicks and send the visitor's reactions in one request 2 seconds after the last click, or earlier when the tab is hidden or closed. Trying out the buttons costs one proof of work and counts once against the rate limit.
 
-The Worker also sets limits that a script cannot get around by dropping or rotating its device token. The key is a hash of the IP address with a random salt per day. The Worker stores the salt in D1 and deletes it after two days. From then on nobody, not even the operator, can trace the stored hashes on posts, votes and reactions back to an IP. The cron also deletes the hashes on posts and reactions after two days.
+The Worker also sets limits that a script cannot get around by dropping or rotating its device token. The key is a hash of the IP address with a random salt per day. The Worker stores the salt in D1 and deletes it after two days. From then on nobody, not even the operator, can trace the stored hashes on posts, votes and reactions back to an IP. The cron also deletes the hashes on posts, votes and reactions after two days.
 
-- At most 10 posts per IP and day, and at most 3 posts per device or IP waiting in the queue. Trusted devices are exempt.
-- One vote per post and one of each reaction per article, per IP and day.
+- At most 10 posts per IP and day, and at most 3 posts per device or IP waiting in the queue. Deleting a post does not free its place in the daily count. Trusted devices are exempt.
+- One new vote per post and one of each reaction per article, per IP and day. A remembered device votes with its device token, so its vote stays its own on later days. Without a remembered device the vote key is the daily IP hash.
 
 If spam gets through anyway, pause the site in the admin panel. A paused site refuses all posts, votes and reactions until you unpause it.
 
@@ -115,15 +115,15 @@ The components switch to dark colors when the page declares `color-scheme: dark`
 
 ## Privacy
 
-The components set no cookies, load no third-party scripts or fonts and write to localStorage only after the visitor acts: the device token and nickname after a post with "Auf diesem Gerät merken" ticked, and a snooze time after the visitor dismisses the prompt. A remembered device shows a "Vergessen" button in every form. It deletes the device's posts (with the replies under them), reactions, callsign and trust on the Worker, then all `afb:` keys in localStorage.
+The components set no cookies, load no third-party scripts or fonts and write to localStorage only after the visitor acts: the device token and nickname after a post with "Auf diesem Gerät merken" ticked, and a snooze time after the visitor dismisses the prompt. A remembered device shows a "Vergessen" button in every form. It deletes the device's posts (with the replies under them), votes, reactions, callsign and trust on the Worker, then all `afb:` keys in localStorage.
 
 What the Worker keeps:
 
 | Data | How long |
 | --- | --- |
 | Post text, nickname, page URL without query, context | Approved posts until deleted, rejected and spam posts 30 days |
-| Device hash (sha256 of the token) on posts, reactions and read markers | Until the posts are deleted or the device is forgotten |
-| Daily IP hash on posts and reactions | 2 days |
+| Device hash (sha256 of the token) on posts, votes, reactions and read markers | Until the posts are deleted or the device is forgotten |
+| Daily IP hash on posts, votes and reactions, and in the daily post count | 2 days |
 | Daily IP salt | 2 days, after that votes and IP-keyed reactions are anonymous |
 | Signatures of used ALTCHA challenges | Until the daily cleanup after they expire (30 minutes) |
 

@@ -41,21 +41,21 @@ Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO. Unser berechtigtes Interesse ist
 
 ### Gerät merken
 
-Unter dem Formular können Sie „Auf diesem Gerät merken" ankreuzen. Die Box ist nicht vorausgewählt. Nur wenn Sie sie ankreuzen, speichert Ihr Browser im lokalen Speicher (localStorage) eine zufällige Gerätekennung und Ihren Namen. Damit sehen Sie Ihre eigenen Beiträge, auch solange sie noch nicht freigegeben sind, und Antworten darauf. Außerdem können Sie Ihre Beiträge dann selbst löschen. Auf unserem Server speichern wir nur einen Hash dieser Kennung: an Ihren Beiträgen und Reaktionen sowie zusammen mit dem Zeitpunkt, an dem Sie Antworten zuletzt angesehen haben.
+Unter dem Formular können Sie „Auf diesem Gerät merken" ankreuzen. Die Box ist nicht vorausgewählt. Nur wenn Sie sie ankreuzen, speichert Ihr Browser im lokalen Speicher (localStorage) eine zufällige Gerätekennung und Ihren Namen. Damit sehen Sie Ihre eigenen Beiträge, auch solange sie noch nicht freigegeben sind, und Antworten darauf. Außerdem können Sie Ihre Beiträge dann selbst löschen. Auf unserem Server speichern wir nur einen Hash dieser Kennung: an Ihren Beiträgen, Stimmen und Reaktionen sowie zusammen mit dem Zeitpunkt, an dem Sie Antworten zuletzt angesehen haben.
 
 Wenn Sie die Karte schließen, die nach einigen Minuten nach Feedback fragt, speichert Ihr Browser außerdem, bis wann sie ausgeblendet bleibt.
 
-Mit „Vergessen" unter dem Formular löschen Sie alle Beiträge dieses Geräts samt den Antworten darauf, Ihre Reaktionen, den erzeugten Namen und alle Einträge des Boards im lokalen Speicher.
+Mit „Vergessen" unter dem Formular löschen Sie alle Beiträge dieses Geräts samt den Antworten darauf, Ihre Stimmen und Reaktionen, den erzeugten Namen und alle Einträge des Boards im lokalen Speicher.
 
 Rechtsgrundlage für das Speichern in Ihrem Browser ist § 25 Abs. 2 Nr. 2 TDDDG, weil Sie diese Funktionen ausdrücklich anfordern. Für die Verarbeitung auf unserem Server gilt Art. 6 Abs. 1 lit. f DSGVO.
 
 ### Abstimmen und Reaktionen
 
-Eine Stimme zählt einmal pro Beitrag, Internetanschluss und Tag. Dafür speichern wir einen Hash aus Ihrer IP-Adresse und einem täglich neuen Zufallswert. Reaktionen auf Artikel speichern wir mit dem Hash Ihrer Gerätekennung, wenn Sie Ihr Gerät merken lassen, sonst mit dem Hash Ihrer IP-Adresse.
+Pro Beitrag, Internetanschluss und Tag kommt höchstens eine neue Stimme hinzu. Dafür speichern wir an jeder Stimme zwei Tage lang einen Hash aus Ihrer IP-Adresse und einem täglich neuen Zufallswert. Wenn Sie Ihr Gerät merken lassen, speichern wir Ihre Stimme mit dem Hash Ihrer Gerätekennung. Sie bleibt dann auch an den folgenden Tagen Ihre Stimme und Sie können sie zurücknehmen. Sonst speichern wir sie mit dem Hash Ihrer IP-Adresse. Reaktionen auf Artikel speichern wir mit dem Hash Ihrer Gerätekennung, wenn Sie Ihr Gerät merken lassen, sonst mit dem Hash Ihrer IP-Adresse.
 
 ### Schutz vor Missbrauch
 
-Damit das Board nicht mit Spam gefüllt wird, begrenzen wir Beiträge, Stimmen und Reaktionen pro Internetanschluss. Dafür bildet unser Server aus Ihrer IP-Adresse und einem Zufallswert, der jeden Tag neu entsteht, einen Hash. Die IP-Adresse selbst speichern wir nicht. Den Zufallswert löschen wir nach zwei Tagen. Danach können auch wir nicht mehr feststellen, zu welcher IP-Adresse ein gespeicherter Hash gehört. Den Hash an Beiträgen und Reaktionen löschen wir ebenfalls nach zwei Tagen.
+Damit das Board nicht mit Spam gefüllt wird, begrenzen wir Beiträge, Stimmen und Reaktionen pro Internetanschluss. Dafür bildet unser Server aus Ihrer IP-Adresse und einem Zufallswert, der jeden Tag neu entsteht, einen Hash. Die IP-Adresse selbst speichern wir nicht. Den Zufallswert löschen wir nach zwei Tagen. Danach können auch wir nicht mehr feststellen, zu welcher IP-Adresse ein gespeicherter Hash gehört. Den Hash an Beiträgen, Stimmen und Reaktionen löschen wir ebenfalls nach zwei Tagen.
 
 Vor dem Senden löst Ihr Browser außerdem eine kleine Rechenaufgabe (ALTCHA). Daran ist kein Drittanbieter beteiligt.
 
@@ -74,7 +74,7 @@ Die Server betreibt Cloudflare, Inc., 101 Townsend St., San Francisco, CA 94107,
 | Freigegebene Beiträge mit Name, Seitenadresse [und Kontextdaten] | bis Sie oder wir sie löschen |
 | Abgelehnte Beiträge und Spam | 30 Tage |
 | Hash der Gerätekennung | bis die Beiträge gelöscht sind oder Sie das Gerät vergessen lassen |
-| Hash der IP-Adresse an Beiträgen und Reaktionen | 2 Tage |
+| Hash der IP-Adresse an Beiträgen, Stimmen und Reaktionen | 2 Tage |
 | Täglicher Zufallswert für den IP-Hash | 2 Tage, danach sind Stimmen und Reaktionen ohne gemerktes Gerät anonym |
 | Einträge im lokalen Speicher Ihres Browsers | bis Sie „Vergessen" wählen oder die Websitedaten im Browser löschen |
 

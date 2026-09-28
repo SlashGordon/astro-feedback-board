@@ -15,7 +15,7 @@ Terms used in the code and in reviews.
 - **Post status**: the moderation state of any post: `pending`, `approved`, `rejected`, `spam`.
 - **Queue**: all pending posts, across sites.
 - **Paused site**: the kill switch. Every write (posts, votes, reactions) answers 503 `site_paused`. Reading still works.
-- **Daily IP hash**: sha256 of the IP with a random salt per UTC day. The salt sits in `ip_salts` and the cron deletes it after two days. The hash is the rate-limit key and the vote key, and posts and reactions keep it for two days for the per-IP caps.
+- **Daily IP hash**: sha256 of the IP with a random salt per UTC day. The salt sits in `ip_salts` and the cron deletes it after two days. The hash is the rate-limit key and the vote key of visitors without a device token. Posts, votes, reactions and the daily post count (`post_quota`) keep it for two days for the per-IP caps.
 - **Forgetting a device**: `DELETE /v1/me` deletes the device's posts, reactions, read markers, callsign and trust. The client then clears its `afb:` keys.
 - **Moderation mode**: per site and separately for feedback, replies and comments: `all`, `untrusted` or `none`.
 - **Device**: a visitor's browser, identified by its **author hash** (`sha256` of the token in localStorage).

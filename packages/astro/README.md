@@ -35,4 +35,5 @@ The components set no cookies and load no third-party scripts or fonts. They wri
 
 ## License
 
-[MIT](https://github.com/SlashGordon/astro-feedback-board/blob/main/LICENSE)
+[MIT](./LICENSE) © [SlashGordon](https://www.slashgordon.link).
+

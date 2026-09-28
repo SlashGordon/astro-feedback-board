@@ -178,6 +178,15 @@ describe("post caps", () => {
     expect((await submitPost(db, site, null, fromIp("ip-3"), bob)).status).toBe("pending");
   });
 
+  it("keeps counting deleted posts toward the daily cap", async () => {
+    const site = await insertSite(db, { moderate_feedback: "none" });
+    for (let i = 0; i < DAILY_POSTS_PER_IP; i++) {
+      const { id } = await submitPost(db, site, null, fromIp("ip-1"), alice);
+      await deleteOwnPost(db, id, alice);
+    }
+    await expect(submitPost(db, site, null, fromIp("ip-1"), alice)).rejects.toThrow("daily_limit");
+  });
+
   it("lets trusted devices through", async () => {
     const site = await insertSite(db);
     await grantTrust(db, { authorHash: alice, siteId: "" }, { days: 0, source: "manual" });
@@ -191,5 +200,6 @@ describe("post caps", () => {
     await forgetPostIpHashes(db, 100);
     const { results } = await db.prepare("SELECT ip_hash FROM posts ORDER BY created_at").all<{ ip_hash: string | null }>();
     expect(results.map((r) => r.ip_hash)).toEqual([null, "ip-1"]);
+    expect(await count("post_quota")).toBe(1);
   });
 });

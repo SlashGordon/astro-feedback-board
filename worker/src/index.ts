@@ -2,6 +2,7 @@ import { verifyAccess } from "./access";
 import { handleAdminApi } from "./admin/api";
 import { adminHtml } from "./admin/ui";
 import { deleteExpiredChallenges } from "./altcha";
+import { forgetVoteIpHashes } from "./board";
 import type { Env } from "./env";
 import { deleteOldSalts } from "./ip";
 import { forgetReactionIpHashes } from "./comments";
@@ -76,6 +77,7 @@ export default {
     await deleteExpiredTrust(env.DB, now);
     await forgetPostIpHashes(env.DB, now - IP_HASH_RETENTION_MS);
     await forgetReactionIpHashes(env.DB, now - IP_HASH_RETENTION_MS);
+    await forgetVoteIpHashes(env.DB, now - IP_HASH_RETENTION_MS);
     await deleteOldSalts(env.DB, new Date(now));
   },
 } satisfies ExportedHandler<Env>;

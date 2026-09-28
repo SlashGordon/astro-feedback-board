@@ -29,7 +29,7 @@ CREATE TABLE trust (
 -- Board feedback (no parent, no article), comments on an article (article set)
 -- and replies to either (parent_id set). kind only matters for board feedback.
 -- author_seq: copy of callsigns.seq, so every post query can name its author
--- without a join. ip_hash: the writer's daily IP hash for the per-IP caps,
+-- without a join. ip_hash: the writer's daily IP hash for the pending cap,
 -- cleared by the cron after two days.
 CREATE TABLE posts (
   id TEXT PRIMARY KEY,
@@ -58,6 +58,15 @@ CREATE INDEX posts_author ON posts (author_hash);
 CREATE INDEX posts_status_created ON posts (status, created_at);
 CREATE INDEX posts_ip ON posts (ip_hash) WHERE ip_hash IS NOT NULL;
 
+-- One row per visitor post and daily IP hash, for the daily cap. Kept apart
+-- from posts, so deleting a post does not free its place. The cron deletes
+-- rows after two days.
+CREATE TABLE post_quota (
+  ip_hash TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX post_quota_ip ON post_quota (ip_hash);
+
 -- Each device's number per site, taken with its first post there. The Worker
 -- turns (site, number) into the device's callsign ("Lunar Otter 42"), see
 -- worker/src/callsign.ts. Rows stay when single posts are deleted, so a device
@@ -70,12 +79,18 @@ CREATE TABLE callsigns (
   UNIQUE (site_id, seq)
 );
 
+-- voter_hash: the device's vote key when it has a token, otherwise the daily
+-- IP hash. ip_hash: the voter's daily IP hash, so each IP adds one vote per
+-- post and day however often it changes the token. Cleared by the cron after
+-- two days.
 CREATE TABLE votes (
   post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   voter_hash TEXT NOT NULL,
   created_at INTEGER NOT NULL,
+  ip_hash TEXT,
   PRIMARY KEY (post_id, voter_hash)
 );
+CREATE INDEX votes_ip ON votes (post_id, ip_hash) WHERE ip_hash IS NOT NULL;
 
 -- Reactions on an article, like on dev.to. Each voter (device token or daily
 -- IP hash) can set each reaction once, and each IP each reaction once per day

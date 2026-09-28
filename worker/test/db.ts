@@ -16,7 +16,7 @@ function statements(sql: string): string[] {
 }
 
 // Children first, so deletes never trip a foreign key.
-const TABLES = ["ip_salts", "callsigns", "seen", "reports", "votes", "reactions", "helpful", "altcha_used", "trust", "posts", "sites"];
+const TABLES = ["post_quota", "ip_salts", "callsigns", "seen", "reports", "votes", "reactions", "helpful", "altcha_used", "trust", "posts", "sites"];
 
 export async function createTestDb() {
   const proxy = await getPlatformProxy<{ DB: D1Database }>({

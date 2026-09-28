@@ -108,17 +108,34 @@ export async function getThread(
   return { feedback: publicPost(post), replies: results.map(publicPost) };
 }
 
-/** Toggles the voter's vote on an approved feedback post. */
-export async function toggleVote(db: D1Database, feedbackId: string, voter: string, now = Date.now()): Promise<VoteResponse> {
+/**
+ * Toggles the voter's vote on an approved feedback post. Each IP adds one vote
+ * per post and day: a vote from a voter with another key (a new device token)
+ * on the same IP is skipped and answers voted: false.
+ */
+export async function toggleVote(
+  db: D1Database,
+  feedbackId: string,
+  voter: string,
+  ipHash: string | null = null,
+  now = Date.now(),
+): Promise<VoteResponse> {
   const removed = await db
     .prepare("DELETE FROM votes WHERE post_id = ? AND voter_hash = ?")
     .bind(feedbackId, voter)
     .run();
-  const voted = removed.meta.changes === 0;
+  let voted = removed.meta.changes === 0;
+  if (voted && ipHash) {
+    const taken = await db
+      .prepare("SELECT 1 FROM votes WHERE post_id = ? AND ip_hash = ? AND voter_hash != ?")
+      .bind(feedbackId, ipHash, voter)
+      .first();
+    voted = !taken;
+  }
   if (voted) {
     await db
-      .prepare("INSERT INTO votes (post_id, voter_hash, created_at) VALUES (?, ?, ?)")
-      .bind(feedbackId, voter, now)
+      .prepare("INSERT INTO votes (post_id, voter_hash, created_at, ip_hash) VALUES (?, ?, ?, ?)")
+      .bind(feedbackId, voter, now, ipHash)
       .run();
   }
   const count = await db
@@ -170,4 +187,9 @@ export async function visitorPosts(db: D1Database, siteId: string, author: strin
     })),
     unseen: [...unseenByThread.values()].reduce((a, b) => a + b, 0),
   };
+}
+
+/** Retention: IP hashes are only needed for the one-vote-per-IP-and-day rule. */
+export async function forgetVoteIpHashes(db: D1Database, cutoff: number): Promise<void> {
+  await db.prepare("UPDATE votes SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND created_at < ?").bind(cutoff).run();
 }

@@ -84,7 +84,7 @@ export interface Draft {
   ipHash?: string;
 }
 
-/** Posts per IP and UTC day, whatever became of them. Trusted devices are exempt. */
+/** Posts per IP and UTC day, whatever became of them, deleted ones included. Trusted devices are exempt. */
 export const DAILY_POSTS_PER_IP = 10;
 /** Posts waiting in the queue per device or IP, across sites. Trusted devices are exempt. */
 export const PENDING_PER_AUTHOR = 3;
@@ -96,7 +96,7 @@ export const PENDING_PER_AUTHOR = 3;
 async function assertPostLimits(db: D1Database, author: string | null, ipHash: string | null, pending: boolean): Promise<void> {
   const counts = await db
     .prepare(
-      `SELECT (SELECT COUNT(*) FROM posts WHERE ip_hash = ?2) AS today,
+      `SELECT (SELECT COUNT(*) FROM post_quota WHERE ip_hash = ?2) AS today,
               (SELECT COUNT(*) FROM posts WHERE status = 'pending' AND (author_hash = ?1 OR ip_hash = ?2)) AS pending`,
     )
     .bind(author, ipHash)
@@ -140,6 +140,7 @@ export async function submitPost(
     approved_at: status === "approved" ? now : null,
     ip_hash: ipHash,
   });
+  if (ipHash) await db.prepare("INSERT INTO post_quota (ip_hash, created_at) VALUES (?, ?)").bind(ipHash, now).run();
   return { id, status };
 }
 
@@ -318,13 +319,15 @@ export async function deleteOwnPost(db: D1Database, id: string, author: string):
 
 /**
  * GDPR Art. 17 for a whole device: its posts (with the replies under them),
- * reactions, reply-badge state, callsign and trust. Votes are keyed by the
- * daily IP hash and cannot be tied to the device.
+ * votes, reactions, reply-badge state, callsign and trust. Votes the device
+ * cast before it had a token are keyed by the daily IP hash and cannot be tied
+ * to it.
  */
-export async function forgetDevice(db: D1Database, author: string, reactor: string): Promise<void> {
+export async function forgetDevice(db: D1Database, author: string, reactor: string, voter: string): Promise<void> {
   await db.batch([
     db.prepare("DELETE FROM posts WHERE author_hash = ?").bind(author),
     db.prepare("DELETE FROM seen WHERE author_hash = ?").bind(author),
+    db.prepare("DELETE FROM votes WHERE voter_hash = ?").bind(voter),
     db.prepare("DELETE FROM reactions WHERE voter_hash = ?").bind(reactor),
     db.prepare("DELETE FROM callsigns WHERE author_hash = ?").bind(author),
     db.prepare("DELETE FROM trust WHERE author_hash = ?").bind(author),
@@ -333,7 +336,10 @@ export async function forgetDevice(db: D1Database, author: string, reactor: stri
 
 /** Retention: IP hashes are only needed for the daily caps. */
 export async function forgetPostIpHashes(db: D1Database, cutoff: number): Promise<void> {
-  await db.prepare("UPDATE posts SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND created_at < ?").bind(cutoff).run();
+  await db.batch([
+    db.prepare("UPDATE posts SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND created_at < ?").bind(cutoff),
+    db.prepare("DELETE FROM post_quota WHERE created_at < ?").bind(cutoff),
+  ]);
 }
 
 /** Retention: deletes rejected and spam posts created before the cutoff. */
