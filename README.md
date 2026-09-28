@@ -5,6 +5,8 @@
 
 # astro-feedback-board
 
+[![CI](https://github.com/SlashGordon/astro-feedback-board/actions/workflows/ci.yml/badge.svg)](https://github.com/SlashGordon/astro-feedback-board/actions/workflows/ci.yml) [![Release](https://github.com/SlashGordon/astro-feedback-board/actions/workflows/release.yml/badge.svg)](https://github.com/SlashGordon/astro-feedback-board/actions/workflows/release.yml)
+
 Anonymous, moderated feedback for Astro sites. Visitors post feedback without an account, an admin approves it in a small panel, and one Cloudflare Worker serves all sites.
 
 `<FeedbackButton />`, `<FeedbackAsk />` and `<FeedbackBoard />` cover feedback with votes, replies, the reply badge, per-site moderation and trusted devices. `<FeedbackComments />` adds dev.to-style reactions and moderated comments to articles, and `<FeedbackPrompt />` asks for feedback after some minutes of active use. Merging duplicates and reports are not built yet.
