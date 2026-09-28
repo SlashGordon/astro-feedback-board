@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/SlashGordon/astro-feedback-board/compare/v0.4.0...v0.4.1) (2026-09-28)
+
+
+### Bug Fixes
+
+* Deleting a post no longer frees up the daily cap ([eaf5a5d](https://github.com/SlashGordon/astro-feedback-board/commit/eaf5a5d31fb264a6b78869aeafbc2e513f4d74b1))
+
 ## [0.4.0](https://github.com/SlashGordon/astro-feedback-board/compare/v0.3.0...v0.4.0) (2026-09-28)
 
 
