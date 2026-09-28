@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/SlashGordon/astro-feedback-board/compare/v0.3.0...v0.4.0) (2026-09-28)
+
+
+### Documentation
+
+* add README to the npm package ([797f182](https://github.com/SlashGordon/astro-feedback-board/commit/797f182c54691a21088b510b8f55d65b83096b47))
+
 ## [0.3.0](https://github.com/SlashGordon/astro-feedback-board/compare/v0.2.0...v0.3.0) (2026-09-28)
 
 
