@@ -145,28 +145,28 @@ describe("comments and reactions", () => {
     expect(list.comments).toHaveLength(1);
   });
 
-  it("needs a solved challenge for a reaction and toggles it per device", async () => {
+  it("needs a solved challenge for reactions and sets them per device", async () => {
     const site = await insertSite(db);
     const token = { "x-author-token": TOKEN };
-    const missing = await post(`/v1/sites/${site.id}/reactions`, { article: "/a", reaction: "like" }, token);
+    const missing = await post(`/v1/sites/${site.id}/reactions`, { article: "/a", reactions: ["like"] }, token);
     expect(await missing.json()).toMatchObject({ error: "altcha_missing" });
 
-    const on = await post(`/v1/sites/${site.id}/reactions`, { article: "/a", reaction: "unicorn", altcha: await altcha() }, token);
-    expect(await on.json()).toMatchObject({ counts: { unicorn: 1 }, mine: ["unicorn"] });
-    const off = await post(`/v1/sites/${site.id}/reactions`, { article: "/a", reaction: "unicorn", altcha: await altcha() }, token);
-    expect(await off.json()).toMatchObject({ counts: { unicorn: 0 }, mine: [] });
+    const on = await post(`/v1/sites/${site.id}/reactions`, { article: "/a", reactions: ["unicorn", "fire"], altcha: await altcha() }, token);
+    expect(await on.json()).toMatchObject({ counts: { unicorn: 1, fire: 1 }, mine: ["unicorn", "fire"] });
+    const off = await post(`/v1/sites/${site.id}/reactions`, { article: "/a", reactions: ["fire"], altcha: await altcha() }, token);
+    expect(await off.json()).toMatchObject({ counts: { unicorn: 0, fire: 1 }, mine: ["fire"] });
   });
 
   it("pretends to accept reactions that filled the honeypot", async () => {
     const site = await insertSite(db);
-    const res = await post(`/v1/sites/${site.id}/reactions`, { article: "/a", reaction: "fire", website: "spam.test" });
+    const res = await post(`/v1/sites/${site.id}/reactions`, { article: "/a", reactions: ["fire"], website: "spam.test" });
     expect(await res.json()).toMatchObject({ counts: { fire: 0 }, mine: [] });
     expect(await db.prepare("SELECT COUNT(*) AS n FROM reactions").first("n")).toBe(0);
   });
 
   it("rejects unknown reactions", async () => {
     const site = await insertSite(db);
-    const res = await post(`/v1/sites/${site.id}/reactions`, { article: "/a", reaction: "poop" });
+    const res = await post(`/v1/sites/${site.id}/reactions`, { article: "/a", reactions: ["poop"] });
     expect(await res.json()).toMatchObject({ error: "invalid_reaction" });
   });
 });
@@ -188,7 +188,7 @@ describe("abuse limits", () => {
     const site = await insertSite(db, { paused: 1 });
     for (const [path, body] of [
       [`/v1/sites/${site.id}/feedback`, { body: "Ein ausreichend langer Text" }],
-      [`/v1/sites/${site.id}/reactions`, { article: "/a", reaction: "like" }],
+      [`/v1/sites/${site.id}/reactions`, { article: "/a", reactions: ["like"] }],
     ] as const) {
       const res = await post(path, body);
       expect(res.status).toBe(503);
@@ -231,7 +231,7 @@ describe("privacy", () => {
     const site = await insertSite(db, { moderate_feedback: "none" });
     const token = { "x-author-token": TOKEN };
     await post(`/v1/sites/${site.id}/feedback`, { body: "Bitte einen Dark Mode einbauen", altcha: await altcha() }, token);
-    await post(`/v1/sites/${site.id}/reactions`, { article: "/a", reaction: "like", altcha: await altcha() }, token);
+    await post(`/v1/sites/${site.id}/reactions`, { article: "/a", reactions: ["like"], altcha: await altcha() }, token);
     await post(`/v1/sites/${site.id}/feedback`, { body: "Von jemand anderem geschrieben", altcha: await altcha() }, {
       "x-author-token": "f".repeat(32),
       "cf-connecting-ip": "9.9.9.9",

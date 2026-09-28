@@ -3,7 +3,6 @@ import { type CommentsResponse, type Reaction, REACTIONS, type ReactionSummary }
 import { publicPost } from "./board";
 import type { PostRow } from "./posts";
 import type { Site } from "./sites";
-import { HttpError } from "./util";
 
 /**
  * Approved comments on an article with their approved replies, oldest first,
@@ -68,36 +67,53 @@ export async function reactionSummary(
 }
 
 /**
- * Sets the voter's reaction, or removes it if it was set. Each IP sets each
- * reaction on an article once per day, so rotating the device token does not
- * add reactions.
+ * Sets the voter's reactions on an article to exactly this set. The client
+ * sends the set once the visitor stopped clicking, so playing with the buttons
+ * costs one request. Each IP sets each reaction on an article once per day, so
+ * rotating the device token does not add reactions: a reaction another device
+ * on the same IP already set is skipped and missing from `mine`.
  */
-export async function toggleReaction(
+export async function setReactions(
   db: D1Database,
   siteId: string,
   article: string,
   voter: string,
-  reaction: Reaction,
+  wanted: readonly Reaction[],
   ipHash: string | null = null,
   now = Date.now(),
 ): Promise<ReactionSummary> {
-  const removed = await db
-    .prepare("DELETE FROM reactions WHERE site_id = ? AND article = ? AND voter_hash = ? AND reaction = ?")
-    .bind(siteId, article, voter, reaction)
-    .run();
-  if (removed.meta.changes === 0) {
-    if (ipHash) {
-      const taken = await db
-        .prepare("SELECT 1 FROM reactions WHERE site_id = ? AND article = ? AND reaction = ? AND ip_hash = ?")
-        .bind(siteId, article, reaction, ipHash)
-        .first();
-      if (taken) throw new HttpError(429, "already_reacted");
-    }
-    await db
-      .prepare("INSERT INTO reactions (site_id, article, voter_hash, reaction, created_at, ip_hash) VALUES (?, ?, ?, ?, ?, ?)")
-      .bind(siteId, article, voter, reaction, now, ipHash)
-      .run();
+  const { results } = await db
+    .prepare("SELECT reaction FROM reactions WHERE site_id = ? AND article = ? AND voter_hash = ?")
+    .bind(siteId, article, voter)
+    .all<{ reaction: Reaction }>();
+  const current = new Set(results.map((r) => r.reaction));
+  const removed = [...current].filter((r) => !wanted.includes(r));
+  let added = [...new Set(wanted)].filter((r) => !current.has(r));
+
+  if (ipHash && added.length) {
+    const { results: taken } = await db
+      .prepare(
+        `SELECT DISTINCT reaction FROM reactions
+         WHERE site_id = ? AND article = ? AND ip_hash = ? AND voter_hash != ?`,
+      )
+      .bind(siteId, article, ipHash, voter)
+      .all<{ reaction: Reaction }>();
+    added = added.filter((r) => !taken.some((t) => t.reaction === r));
   }
+
+  const statements = [
+    ...removed.map((reaction) =>
+      db
+        .prepare("DELETE FROM reactions WHERE site_id = ? AND article = ? AND voter_hash = ? AND reaction = ?")
+        .bind(siteId, article, voter, reaction),
+    ),
+    ...added.map((reaction) =>
+      db
+        .prepare("INSERT INTO reactions (site_id, article, voter_hash, reaction, created_at, ip_hash) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(siteId, article, voter, reaction, now, ipHash),
+    ),
+  ];
+  if (statements.length) await db.batch(statements);
   return reactionSummary(db, siteId, article, voter);
 }
 

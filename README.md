@@ -98,7 +98,7 @@ window.feedbackBoard = { getContext: () => ({ plan: currentPlan.id }) };
 
 The context is stored with the post for as long as the post exists and is shown in the admin panel. Don't put user IDs, email addresses or other personal data into it.
 
-Every form has the spam layers built in: a honeypot field that people never see, a minimum of 3 seconds between rendering and sending, and an ALTCHA proof of work that the browser solves in the background. Reactions use the same layers.
+Every form has the spam layers built in: a honeypot field that people never see, a minimum of 3 seconds between rendering and sending, and an ALTCHA proof of work that the browser solves in the background. Reactions use the same layers. The reaction buttons collect clicks and send the visitor's reactions in one request 2 seconds after the last click, or earlier when the tab is hidden or closed. Trying out the buttons costs one proof of work and counts once against the rate limit.
 
 The Worker also sets limits that a script cannot get around by dropping or rotating its device token. The key is a hash of the IP address with a random salt per day. The Worker stores the salt in D1 and deletes it after two days. From then on nobody, not even the operator, can trace the stored hashes on posts, votes and reactions back to an IP. The cron also deletes the hashes on posts and reactions after two days.
 

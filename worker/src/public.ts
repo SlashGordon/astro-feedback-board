@@ -8,12 +8,13 @@ import {
   isKind,
   isReaction,
   isTopicStatus,
+  REACTIONS,
   type ReactionRequest,
   type SubmitRequest,
 } from "astro-feedback-board/protocol";
 import { consumeChallenge, createChallenge, verifySolution } from "./altcha";
 import { getThread, listFeedback, toggleVote, visitorPosts } from "./board";
-import { listComments, reactionSummary, toggleReaction } from "./comments";
+import { listComments, reactionSummary, setReactions } from "./comments";
 import { normalizeContext, normalizeNickname, normalizePageUrl } from "./content";
 import type { Env } from "./env";
 import { notifyNewPost } from "./notify";
@@ -159,9 +160,12 @@ export const publicRoutes = [
     const voter = await reactorHash(request, env, ipHash);
     // A bot gets the current summary back as if its reaction counted.
     if (filledHoneypot(input)) return json(await reactionSummary(env.DB, site.id, article, voter));
-    if (!isReaction(input.reaction)) throw new HttpError(422, "invalid_reaction");
+    const wanted = input.reactions;
+    if (!Array.isArray(wanted) || wanted.length > REACTIONS.length || !wanted.every(isReaction)) {
+      throw new HttpError(422, "invalid_reaction");
+    }
     await verifyAltcha(env, input.altcha);
-    return json(await toggleReaction(env.DB, site.id, article, voter, input.reaction, ipHash));
+    return json(await setReactions(env.DB, site.id, article, voter, wanted, ipHash));
   }),
 
   route("GET", "/v1/feedback/:id", {}, async ({ request, env, params }) =>

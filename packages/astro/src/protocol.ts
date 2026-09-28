@@ -182,12 +182,13 @@ export interface CommentsResponse {
 }
 
 /**
- * POST /v1/sites/:site/reactions toggles one reaction and answers with the
- * new ReactionSummary. Protected like a post: honeypot, fill time and ALTCHA.
+ * POST /v1/sites/:site/reactions sets the visitor's reactions on the article
+ * to exactly `reactions` and answers with the new ReactionSummary. Protected
+ * like a post: honeypot, fill time and ALTCHA.
  */
 export interface ReactionRequest {
   article: string;
-  reaction: Reaction;
+  reactions: Reaction[];
   altcha: string;
   website?: string;
 }
@@ -228,7 +229,6 @@ export type ErrorCode =
   | "rate_limited"
   | "daily_limit"
   | "too_many_pending"
-  | "already_reacted"
   | "site_paused"
   | "invalid_kind"
   | "invalid_article"

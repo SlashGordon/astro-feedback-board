@@ -31,10 +31,11 @@ class Comments {
   private solver: ChallengeSolver;
   /** What the Worker last confirmed. */
   private confirmed?: ReactionSummary;
-  /** Optimistic state while toggles are on their way. */
+  /** Optimistic state while the visitor clicks and until the Worker answers. */
   private shown?: ReactionSummary;
-  private pending = 0;
-  private queue: Promise<void> = Promise.resolve();
+  /** Sends the reactions once the visitor stopped clicking. */
+  private timer?: ReturnType<typeof setTimeout>;
+  private sending?: Promise<void>;
 
   constructor(private el: HTMLElement) {
     this.endpoint = el.dataset.endpoint ?? "";
@@ -78,7 +79,7 @@ class Comments {
       );
       this.renderComments(data.comments);
       this.confirmed = data.reactions;
-      if (!this.pending) this.renderReactions(data.reactions);
+      if (!this.shown) this.renderReactions(data.reactions);
       // Loading marks the visitor's own comments as seen, so the reply badge changes.
       if (visitor.token()) void visitor.refresh(this.endpoint, this.site);
     } catch {
@@ -159,7 +160,7 @@ class Comments {
     if (text) status.append(document.createTextNode(text));
   }
 
-  /** Shows the toggle at once and sends it in the background, one request after the other. */
+  /** Shows the toggle at once and sends the whole set after REACTION_DELAY_MS without clicks. */
   private toggle(reaction: Reaction): void {
     const shown = this.shown ?? this.confirmed;
     if (!shown) return;
@@ -170,11 +171,31 @@ class Comments {
     };
     this.renderReactions(this.shown);
     this.setStatus("", "");
-    this.pending++;
-    this.queue = this.queue.then(() => this.send(reaction));
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => void this.flush(), REACTION_DELAY_MS);
   }
 
-  private async send(reaction: Reaction): Promise<void> {
+  /** Sends the shown set unless it equals the confirmed one. One request at a time. */
+  async flush(keepalive = false): Promise<void> {
+    clearTimeout(this.timer);
+    this.timer = undefined;
+    if (this.sending) {
+      await this.sending;
+      // Clicks during the request start their own timer.
+      if (this.timer) return;
+    }
+    const wanted = this.shown?.mine;
+    if (!wanted || !this.confirmed) return;
+    if (sameSet(wanted, this.confirmed.mine)) {
+      this.shown = undefined;
+      this.renderReactions(this.confirmed);
+      return;
+    }
+    this.sending = this.send(wanted, keepalive).finally(() => (this.sending = undefined));
+    await this.sending;
+  }
+
+  private async send(wanted: Reaction[], keepalive: boolean): Promise<void> {
     const honeypot =
       (this.reactions?.elements.namedItem("website") as HTMLInputElement | null)?.value ?? "";
     try {
@@ -182,12 +203,15 @@ class Comments {
         const altcha = await this.solver.take();
         // Solve the next challenge while this request runs.
         this.solver.prepare();
-        const request: ReactionRequest = { article: this.article, reaction, altcha, website: honeypot };
+        const request: ReactionRequest = { article: this.article, reactions: wanted, altcha, website: honeypot };
         try {
           this.confirmed = await visitor.request<ReactionSummary>(this.endpoint, `${this.path}/reactions`, {
             method: "POST",
             body: JSON.stringify(request),
+            keepalive,
           });
+          // The Worker skips a reaction another device on the same connection set today.
+          if (wanted.some((r) => !this.confirmed?.mine.includes(r))) this.setStatus("error", this.t.errorAlreadyReacted);
           return;
         } catch (error) {
           if (error instanceof ApiError && error.code.startsWith("altcha_") && attempt === 0) continue;
@@ -197,8 +221,8 @@ class Comments {
     } catch (error) {
       this.setStatus("error", errorMessage(error instanceof ApiError ? error.code : undefined, this.t));
     } finally {
-      // Once every toggle is through, show what the Worker stored.
-      if (--this.pending === 0 && this.confirmed) {
+      // Without new clicks, show what the Worker stored.
+      if (!this.timer && this.confirmed) {
         this.shown = undefined;
         this.renderReactions(this.confirmed);
       }
@@ -206,15 +230,38 @@ class Comments {
   }
 }
 
-const widgets = new WeakSet<HTMLElement>();
+/** Quiet time after the last click before the reactions go out. */
+const REACTION_DELAY_MS = 2000;
+
+function sameSet(a: readonly Reaction[], b: readonly Reaction[]): boolean {
+  return a.length === b.length && a.every((r) => b.includes(r));
+}
+
+const widgets = new Map<HTMLElement, Comments>();
+let initialized = false;
+
+/** Sends unsent reactions right away when the tab is hidden or closed. */
+function flushAll(): void {
+  for (const widget of widgets.values()) void widget.flush(true);
+}
 
 export function initComments(): void {
   const setup = () =>
     document.querySelectorAll<HTMLElement>("[data-afb-comments]").forEach((el) => {
       if (widgets.has(el)) return;
-      widgets.add(el);
-      new Comments(el);
+      widgets.set(el, new Comments(el));
     });
   setup();
+  if (initialized) return;
+  initialized = true;
   document.addEventListener("astro:page-load", setup);
+  // A view transition swaps the page; send before the old widgets go away.
+  document.addEventListener("astro:before-swap", () => {
+    flushAll();
+    widgets.clear();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushAll();
+  });
+  window.addEventListener("pagehide", flushAll);
 }

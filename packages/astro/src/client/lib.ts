@@ -71,8 +71,6 @@ export function errorMessage(code: string | undefined, t: Strings): string {
       return t.errorDailyLimit;
     case "too_many_pending":
       return t.errorTooManyPending;
-    case "already_reacted":
-      return t.errorAlreadyReacted;
     case "site_paused":
       return t.errorPaused;
     default:

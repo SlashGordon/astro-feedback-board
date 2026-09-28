@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getThread, listFeedback, visitorPosts } from "../src/board";
-import { listComments, toggleReaction } from "../src/comments";
+import { listComments, setReactions } from "../src/comments";
 import { createTeamReply, type Draft, findFeedback, moderatePost, submitPost } from "../src/posts";
 import { sha256 } from "../src/util";
 import { createTestDb, insertSite } from "./db";
@@ -66,39 +66,42 @@ describe("comments", () => {
 describe("reactions", () => {
   const zero = { like: 0, unicorn: 0, mindblown: 0, clap: 0, fire: 0 };
 
-  it("toggle per voter and count per reaction", async () => {
+  it("set the voter's reactions to exactly the given set", async () => {
     const site = await insertSite(db);
-    await toggleReaction(db, site.id, "/blog/hello", "a", "like");
-    await toggleReaction(db, site.id, "/blog/hello", "b", "like");
-    expect(await toggleReaction(db, site.id, "/blog/hello", "b", "fire")).toEqual({
+    await setReactions(db, site.id, "/blog/hello", "a", ["like"]);
+    expect(await setReactions(db, site.id, "/blog/hello", "b", ["like", "fire"])).toEqual({
       counts: { ...zero, like: 2, fire: 1 },
       mine: ["like", "fire"],
     });
-    expect(await toggleReaction(db, site.id, "/blog/hello", "b", "like")).toEqual({
+    expect(await setReactions(db, site.id, "/blog/hello", "b", ["fire", "fire"])).toEqual({
       counts: { ...zero, like: 1, fire: 1 },
       mine: ["fire"],
     });
 
     const { reactions } = await listComments(db, site, "/blog/hello", "c", null);
     expect(reactions).toEqual({ counts: { ...zero, like: 1, fire: 1 }, mine: [] });
+    expect(await setReactions(db, site.id, "/blog/hello", "b", [])).toEqual({ counts: { ...zero, like: 1 }, mine: [] });
     expect((await listComments(db, site, "/blog/other", "a", null)).reactions).toEqual({ counts: zero, mine: [] });
   });
 
   it("count each reaction once per IP, whatever the token", async () => {
     const site = await insertSite(db);
-    await toggleReaction(db, site.id, "/a", "a", "like", "ip-1");
-    await expect(toggleReaction(db, site.id, "/a", "b", "like", "ip-1")).rejects.toThrow("already_reacted");
-    // Other reactions, other articles and other IPs are fine, and the owner can still take it back.
-    await toggleReaction(db, site.id, "/a", "b", "fire", "ip-1");
-    await toggleReaction(db, site.id, "/b", "b", "like", "ip-1");
-    await toggleReaction(db, site.id, "/a", "c", "like", "ip-2");
-    expect(await toggleReaction(db, site.id, "/a", "a", "like", "ip-1")).toMatchObject({ counts: { like: 1, fire: 1 } });
+    await setReactions(db, site.id, "/a", "a", ["like"], "ip-1");
+    // A new token on the same IP gets "fire" but not "like" again.
+    expect(await setReactions(db, site.id, "/a", "b", ["like", "fire"], "ip-1")).toMatchObject({
+      counts: { like: 1, fire: 1 },
+      mine: ["fire"],
+    });
+    // Other articles and other IPs are fine, and the owner can still take it back.
+    await setReactions(db, site.id, "/b", "b", ["like"], "ip-1");
+    await setReactions(db, site.id, "/a", "c", ["like"], "ip-2");
+    expect(await setReactions(db, site.id, "/a", "a", [], "ip-1")).toMatchObject({ counts: { like: 1, fire: 1 } });
   });
 
   it("reject unknown reactions in the database too", async () => {
     const site = await insertSite(db);
     // @ts-expect-error: not a reaction
-    await expect(toggleReaction(db, site.id, "/x", "a", "poop")).rejects.toThrow();
+    await expect(setReactions(db, site.id, "/x", "a", ["poop"])).rejects.toThrow();
   });
 });
 
