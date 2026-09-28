@@ -456,6 +456,9 @@
 .afb-dialog {
   width: min(34rem, calc(100vw - 2rem));
   max-height: calc(100dvh - 2rem);
+  /* Centers the modal. Browsers do this by default, but CSS resets such as
+     Tailwind's preflight set margin: 0 on every element. */
+  margin: auto;
   padding: 0;
   overflow: auto;
   border: 1px solid var(--_border);

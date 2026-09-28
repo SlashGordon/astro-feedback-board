@@ -128,7 +128,7 @@ What the Worker keeps:
 | Daily IP salt | 2 days, after that votes and IP-keyed reactions are anonymous |
 | Signatures of used ALTCHA challenges | Until the daily cleanup after they expire (30 minutes) |
 
-Visitors without a remembered device cannot delete their posts themselves, so name a contact for deletion requests in your privacy policy. [docs/datenschutz.md](docs/datenschutz.md) is a German template for that section of the privacy policy. The Worker runs on Cloudflare, which processes the IP address of every request, including the requests that `<FeedbackBoard />` and `<FeedbackComments />` send when the page loads.
+Visitors without a remembered device cannot delete their posts themselves, so name a contact for deletion requests in your privacy policy. [docs/datenschutz.md](docs/datenschutz.md) is a German template for that section of the privacy policy. The Worker runs on Cloudflare, which processes the IP address of every request, including the requests that `<FeedbackBoard />` and `<FeedbackComments />` send when the page loads. On a remembered device, `<FeedbackButton />` also asks the Worker for new replies on every page it is on.
 
 ## License
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { strings } from "../i18n";
-import { buildContext, errorMessage, issuedAt, newToken, solveChallenge } from "./lib";
+import { buildContext, errorMessage, findNumber, issuedAt, newToken, solveChallenge } from "./lib";
 
 async function sha256Hex(input: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
@@ -15,6 +15,13 @@ describe("solveChallenge", () => {
     expect(payload.number).toBe(1234);
     expect(payload.signature).toBe("sig");
     expect(issuedAt(c)).toBe(1000);
+  });
+
+  it("works as standalone source text, the way the Web Worker gets it", async () => {
+    const salt = "abc?issued=1000&expires=2000";
+    const standalone = new Function(`return (${findNumber.toString()});`)() as typeof findNumber;
+    expect(await standalone(salt, await sha256Hex(salt + 777), 1000, false)).toBe(777);
+    expect(await standalone(salt, await sha256Hex("other"), 1000, false)).toBe(-1);
   });
 });
 

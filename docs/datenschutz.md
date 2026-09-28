@@ -18,7 +18,7 @@ Auf [dieser Website] können Sie Feedback geben, Ideen und Fehler melden, Artike
 
 ### Beim Aufruf einer Seite
 
-Seiten mit dem Feedback-Board oder mit Kommentaren laden deren Inhalte beim Aufruf von [feedback.example.org]. Dabei verarbeitet Cloudflare Ihre IP-Adresse und technische Angaben der Anfrage, etwa Browser und aufgerufene Adresse, um die Inhalte auszuliefern und Angriffe abzuwehren. Wir selbst speichern dabei keine IP-Adresse.
+Seiten mit dem Feedback-Board oder mit Kommentaren laden ihre Inhalte beim Aufruf von [feedback.example.org]. Wenn Sie Ihr Gerät merken lassen, fragt außerdem jede Seite mit dem Feedback-Button dort nach neuen Antworten auf Ihre Beiträge. Dabei verarbeitet Cloudflare Ihre IP-Adresse und technische Angaben der Anfrage, etwa Browser und aufgerufene Adresse, um die Inhalte auszuliefern und Angriffe abzuwehren. Wir selbst speichern dabei keine IP-Adresse.
 
 Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO. Unser berechtigtes Interesse ist die sichere Auslieferung der Website.
 
