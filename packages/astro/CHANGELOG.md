@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/SlashGordon/astro-feedback-board/compare/v0.4.1...v0.4.2) (2026-09-29)
+
+
+### Bug Fixes
+
+* layout issue feedback box ([d54520a](https://github.com/SlashGordon/astro-feedback-board/commit/d54520a9746d355c8013e4e5f349b2d1b799b6fa))
+
 ## [0.4.1](https://github.com/SlashGordon/astro-feedback-board/compare/v0.4.0...v0.4.1) (2026-09-28)
 
 
