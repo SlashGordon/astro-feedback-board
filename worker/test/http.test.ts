@@ -305,6 +305,16 @@ describe("admin API", () => {
     expect(await reply.json()).toMatchObject({ status: "approved" });
   });
 
+  it("serves the statistics and validates the period", async () => {
+    const site = await insertSite(db, { name: "Fuseplan" });
+    const stats = await (await admin(`/stats?site=${site.id}&days=30`, "GET")).json<{ sites: unknown[] }>();
+    expect(stats).toMatchObject({ totals: { feedback: 0 }, sites: [{ id: site.id, name: "Fuseplan" }], articles: [], feedback: [] });
+
+    const bad = await admin("/stats?days=soon", "GET");
+    expect(bad.status).toBe(422);
+    expect(await bad.json()).toMatchObject({ error: "invalid_days" });
+  });
+
   it("validates site settings", async () => {
     const res = await admin("/sites", "POST", { id: "demo", name: "Demo", origin: ORIGIN, moderate_feedback: "sometimes" });
     expect(await res.json()).toMatchObject({ error: "invalid_mode" });

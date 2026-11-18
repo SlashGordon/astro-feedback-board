@@ -31,6 +31,7 @@ Terms used in the code and in reviews.
 - **Trust** (`worker/src/trust.ts`): grants, revokes and checks trusted devices.
 - **Comments** (`worker/src/comments.ts`): the comments and reactions of one article.
 - **Board views** (`worker/src/board.ts`): what the public board reads: lists, threads, votes and the visitor's own posts.
+- **Statistics** (`worker/src/stats.ts`): what the admin panel's statistics view reads: counts per site, the articles with the most reactions and comments and the feedback with the most votes, for all time or the last days.
 - **Route table** (`worker/src/router.ts`): routes with their guards (target site or feedback, origin check, paused site, rate limit).
 - **Visitor session** (`packages/astro/src/client/visitor.ts`): the device token, the nickname, prompt snoozes and the visitor's own posts in the browser. Badges and boards watch it instead of fetching on their own.
 - **Activity clock** (`packages/astro/src/client/activity.ts`): counts active time for the activity prompt.

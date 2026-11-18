@@ -1,10 +1,10 @@
 // Admin panel: one static page, talks to /admin/api. Visitor content is only
 // ever inserted with textContent, never as HTML. Icons are Lucide (ISC license).
-import type { Kind, ModerationMode, TopicStatus } from "astro-feedback-board/protocol";
+import type { Kind, ModerationMode, Reaction, TopicStatus } from "astro-feedback-board/protocol";
 import { NOTE_MAX_LENGTH } from "../trust";
 
 // Labels for the admin panel. Typed against the protocol, so a new kind,
-// topic status or mode fails the type check until it has a label here.
+// topic status, mode or reaction fails the type check until it has a label here.
 const KIND_LABELS: Record<Kind, string> = { feedback: "Feedback", idea: "Idee", bug: "Fehler" };
 const TOPIC_LABELS: Record<TopicStatus, string> = {
   open: "Offen",
@@ -17,6 +17,14 @@ const MODE_LABELS: Record<ModerationMode, string> = {
   all: "Alles prüfen",
   untrusted: "Nur unbekannte Geräte prüfen",
   none: "Keine Moderation",
+};
+// The emoji visitors click, in display order, with their German names.
+const REACTION_LABELS: Record<Reaction, { emoji: string; name: string }> = {
+  like: { emoji: "❤️", name: "Gefällt mir" },
+  unicorn: { emoji: "🦄", name: "Einhorn" },
+  mindblown: { emoji: "🤯", name: "Umgehauen" },
+  clap: { emoji: "🙌", name: "Applaus" },
+  fire: { emoji: "🔥", name: "Feuer" },
 };
 
 export const adminHtml = /* html */ `<!doctype html>
@@ -156,6 +164,28 @@ export const adminHtml = /* html */ `<!doctype html>
   .check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
   .check input { width: 16px; height: 16px; accent-color: var(--accent); }
 
+  /* Statistics */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .stat { display: grid; gap: 2px; padding: 14px 18px; }
+  .stat-label { font-size: 13px; color: var(--subtle); }
+  .stat-value { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; }
+  .rank h2 { margin: 0; padding: 14px 16px; font-size: 16px; }
+  .rank th { border-top: 1px solid var(--line); }
+  .rank .none { margin: 0; padding: 0 16px 16px; color: var(--subtle); font-size: 14px; }
+  /* Narrow screens scroll the table inside its card instead of squeezing the first column. */
+  .rank table { min-width: 640px; }
+  th.num, td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  th.bar-col { width: 38%; }
+  /* The padding keeps room for the value behind the longest bar. */
+  .bar-cell { display: flex; align-items: center; gap: 8px; min-width: 140px; padding-right: calc(8px + 7ch); font-variant-numeric: tabular-nums; }
+  .bar-cell > * { flex: none; }
+  .rank-bar { height: 8px; border-radius: 0 4px 4px 0; background: var(--accent); }
+  .sub { font-size: 12.5px; color: var(--subtle); }
+  .sub span { white-space: nowrap; }
+  .clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  td a { color: inherit; text-decoration-color: var(--line-strong); text-underline-offset: 3px; overflow-wrap: anywhere; }
+  td a:hover { text-decoration-color: currentColor; }
+
   /* Sites */
   .site-form { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
   .site-form h2 { grid-column: 1 / -1; margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
@@ -188,6 +218,7 @@ export const adminHtml = /* html */ `<!doctype html>
       <button data-view="queue"><span data-icon="inbox"></span>Queue <span class="count" id="queue-count"></span></button>
       <button data-view="feedback"><span data-icon="message"></span>Feedback</button>
       <button data-view="comments"><span data-icon="reply"></span>Kommentare</button>
+      <button data-view="stats"><span data-icon="chart"></span>Statistik</button>
       <button data-view="devices"><span data-icon="shield"></span>Geräte</button>
       <button data-view="sites"><span data-icon="globe"></span>Sites</button>
     </nav>
@@ -217,6 +248,7 @@ export const adminHtml = /* html */ `<!doctype html>
     party: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
     alert: '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
     plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+    chart: '<path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/>',
   };
   function icon(name) {
     const span = document.createElement("span");
@@ -538,6 +570,84 @@ export const adminHtml = /* html */ `<!doctype html>
     return card;
   }
 
+  // Statistics ------------------------------------------------------------
+
+  const REACTIONS = ${JSON.stringify(REACTION_LABELS)};
+  const PERIODS = { "0": "Gesamt", "7": "Letzte 7 Tage", "30": "Letzte 30 Tage", "90": "Letzte 90 Tage", "365": "Letzte 365 Tage" };
+  let statsDays = "0";
+  const count = (n) => n.toLocaleString("de-DE");
+
+  /** A bar on the scale of the column's largest value, with the value at its tip. */
+  function barCell(value, max) {
+    const bar = h("span", { class: "rank-bar", "aria-hidden": "true" });
+    bar.style.width = (max ? (value / max) * 100 : 0) + "%";
+    return h("div", { class: "bar-cell" }, bar, h("span", {}, count(value)));
+  }
+
+  /** A ranking card. Columns are [label, class]; the rows hold one cell per column. */
+  function rankCard(title, columns, rows, none) {
+    return h("section", { class: "card table-card rank" }, h("h2", {}, title),
+      rows.length
+        ? h("table", {},
+            h("thead", {}, h("tr", {}, ...columns.map(([label, cls]) => h("th", { class: cls, scope: "col" }, label)))),
+            h("tbody", {}, ...rows.map((cells) => h("tr", {}, ...cells.map((cell, i) => h("td", { class: columns[i][1] === "num" ? "num" : null }, cell))))))
+        : h("p", { class: "none" }, none));
+  }
+
+  /** Article keys are usually paths, so they link to the site's first origin. */
+  function articleLink(a) {
+    const origin = sites.find((s) => s.id === a.site_id)?.origin.split(/\\s+/)[0];
+    if (!origin || !a.article.startsWith("/")) return a.article;
+    return h("a", { href: origin + a.article, target: "_blank", rel: "noopener" }, a.article);
+  }
+
+  function reactionSplit(byReaction) {
+    const parts = Object.entries(REACTIONS).filter(([r]) => byReaction[r] > 0)
+      .map(([r, { emoji, name }]) => h("span", { title: name }, emoji + " " + count(byReaction[r])));
+    return parts.length ? h("div", { class: "sub" }, ...parts.flatMap((part, i) => (i ? [" · ", part] : [part]))) : null;
+  }
+
+  async function renderStats() {
+    const query = new URLSearchParams({ days: statsDays });
+    if (siteFilter.value) query.set("site", siteFilter.value);
+    const stats = await api("/stats?" + query);
+    const filtered = !!siteFilter.value;
+    const period = statsDays === "0" ? "" : " im Zeitraum";
+    const siteColumn = filtered ? [] : [["Site"]];
+    const maxOf = (rows, key) => Math.max(0, ...rows.map((row) => row[key]));
+    const maxFeedback = maxOf(stats.sites, "feedback");
+    const maxReactions = maxOf(stats.articles, "reactions");
+    const maxVotes = maxOf(stats.feedback, "votes");
+    const tiles = [
+      ["Feedback", stats.totals.feedback], ["Kommentare", stats.totals.comments],
+      ["Antworten", stats.totals.replies, "Antworten von Besuchern, ohne Team"],
+      ["Stimmen", stats.totals.votes], ["Reaktionen", stats.totals.reactions],
+    ];
+    main.replaceChildren(
+      pageHead("Statistik", filtered ? "Aktivität auf " + siteFilter.selectedOptions[0].textContent : "Aktivität auf allen Sites",
+        select(PERIODS, statsDays, (days) => { statsDays = days; render(); }, "", "Zeitraum")),
+      h("div", { class: "stats" }, ...tiles.map(([label, value, hint]) =>
+        h("div", { class: "card stat", title: hint }, h("span", { class: "stat-label" }, label), h("span", { class: "stat-value" }, count(value))))),
+      h("div", { class: "list" },
+        filtered ? null : rankCard("Sites nach Feedback",
+          [["Site"], ["Feedback", "bar-col"], ["Kommentare", "num"], ["Antworten", "num"], ["Stimmen", "num"], ["Reaktionen", "num"]],
+          stats.sites.map((s) => [s.name, barCell(s.feedback, maxFeedback), count(s.comments), count(s.replies), count(s.votes), count(s.reactions)]),
+          "Noch keine Sites angelegt."),
+        rankCard("Artikel nach Reaktionen",
+          [["Artikel"], ...siteColumn, ["Reaktionen", "bar-col"], ["Kommentare", "num"]],
+          stats.articles.map((a) => [articleLink(a), ...(filtered ? [] : [a.site_name]),
+            h("div", {}, barCell(a.reactions, maxReactions), reactionSplit(a.by_reaction)), count(a.comments)]),
+          "Keine Reaktionen oder Kommentare" + period + "."),
+        rankCard("Feedback nach Stimmen",
+          [["Feedback"], ...siteColumn, ["Stimmen", "bar-col"]],
+          stats.feedback.map((f) => [
+            h("div", {}, h("div", { class: "clamp", title: f.body }, f.body),
+              h("div", { class: "sub" }, KINDS[f.kind] + " · " + TOPICS[f.topic_status || "open"] + " · " + ago(f.created_at))),
+            ...(filtered ? [] : [f.site_name]), barCell(f.votes, maxVotes)]),
+          "Keine Stimmen" + period + ".")),
+    );
+  }
+
   // Trusted devices -------------------------------------------------------
 
   async function renderDevices() {
@@ -630,6 +740,7 @@ export const adminHtml = /* html */ `<!doctype html>
     try {
       if (view === "queue") await renderQueue();
       else if (view === "feedback" || view === "comments") await renderFeedback();
+      else if (view === "stats") await renderStats();
       else if (view === "devices") await renderDevices();
       else renderSites();
     } catch (e) {

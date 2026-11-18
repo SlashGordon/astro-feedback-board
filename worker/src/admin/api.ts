@@ -13,6 +13,7 @@ import {
 } from "../posts";
 import { route, router } from "../router";
 import { defaultSettings, getSite, listSites, saveSite, type SiteInput } from "../sites";
+import { getStats, parseDays } from "../stats";
 import { grantTrust, listTrust, parseTrustKey, trustedSql } from "../trust";
 import { HttpError, json, readJson } from "../util";
 
@@ -134,6 +135,10 @@ const handleAdminRoute = router([
     if (!parent) throw new HttpError(404, "feedback_not_found");
     return json(await createTeamReply(env.DB, parent, body, env.TEAM_NAME || "Team"), { status: 201 });
   }),
+
+  route("GET", "/stats", {}, async ({ env, url }) =>
+    json(await getStats(env.DB, { site: url.searchParams.get("site"), days: parseDays(url.searchParams.get("days")) })),
+  ),
 
   route("GET", "/trust", {}, async ({ env }) => json({ trust: await listTrust(env.DB) })),
 

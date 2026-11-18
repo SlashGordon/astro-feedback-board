@@ -9,7 +9,7 @@
 
 Anonymous, moderated feedback for Astro sites. Visitors post feedback without an account, an admin approves it in a small panel, and one Cloudflare Worker serves all sites.
 
-`<FeedbackButton />`, `<FeedbackAsk />` and `<FeedbackBoard />` cover feedback with votes, replies, the reply badge, per-site moderation and trusted devices. `<FeedbackComments />` adds dev.to-style reactions and moderated comments to articles, and `<FeedbackPrompt />` asks for feedback after some minutes of active use. Merging duplicates and reports are not built yet.
+`<FeedbackButton />`, `<FeedbackAsk />` and `<FeedbackBoard />` cover feedback with votes, replies, the reply badge, per-site moderation and trusted devices. `<FeedbackComments />` adds dev.to-style reactions and moderated comments to articles, and `<FeedbackPrompt />` asks for feedback after some minutes of active use. The admin panel's statistics view ranks sites by feedback, articles by reactions and feedback by votes, for all time or the last 7 to 365 days. Merging duplicates and reports are not built yet.
 
 The package started as the feedback system of [Fuseplan](https://www.fuseplan.app/) and was extracted from the app so other Astro sites can use it.
 
