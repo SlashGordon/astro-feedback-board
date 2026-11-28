@@ -1,0 +1,11 @@
+# One pnpm workspace: the published Astro package, the Cloudflare Worker and the demo site share this lockfile.
+packages:
+  - packages/astro
+  - worker
+  - demo
+nodeLinker: hoisted
+# Install scripts stay off, as under npm with ignore-scripts: esbuild and workerd (wrangler) find their
+# platform binaries in their optional dependencies.
+allowBuilds:
+  esbuild: false
+  workerd: false

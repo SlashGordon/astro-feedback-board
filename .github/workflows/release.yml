@@ -46,11 +46,14 @@ jobs:
         with:
           ref: ${{ env.TAG }}
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-          cache: npm
+          cache: 'pnpm'
 
       # Trusted publishing (tokenless OIDC auth) needs npm >= 11.5.1;
       # Node 22 still bundles npm 10.
@@ -63,8 +66,12 @@ jobs:
           echo "git tag=$TAG  package.json=$pkg"
           test "$pkg" = "$TAG"
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
       # Only the package's own tests: the Worker is not published, and CI runs
       # every test on each push.
-      - run: npm run typecheck && npm test --workspace packages/astro
-      - run: npm publish --workspace packages/astro --provenance --access public
+      - run: pnpm run typecheck && pnpm --filter ./packages/astro test
+      # npm publishes packages/astro (no workspace dependencies) with trusted publishing and the .npmrc
+      # that setup-node wrote for registry-url; pnpm 11 and later do not read that file, which setup-node
+      # passes as NPM_CONFIG_USERCONFIG.
+      - run: npm publish --provenance --access public
+        working-directory: packages/astro

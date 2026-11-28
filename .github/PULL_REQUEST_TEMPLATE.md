@@ -4,7 +4,7 @@
 
 ## Checklist
 
-- [ ] `npm run typecheck && npm test` pass
-- [ ] `npm run build --workspace demo` succeeds
+- [ ] `pnpm run typecheck && pnpm test` pass
+- [ ] `pnpm --filter ./demo run build` succeeds
 - [ ] New D1 migration in `worker/migrations/` if the schema changed
 - [ ] Docs / README updated if behaviour or props changed

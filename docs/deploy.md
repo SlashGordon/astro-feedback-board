@@ -13,9 +13,9 @@ All commands run in `worker/` unless a step says otherwise.
 ## 1. Install and log in
 
 ```sh
-npm install
+pnpm install
 cd worker
-npx wrangler login
+pnpm exec wrangler login
 ```
 
 ## 2. Create a private config
@@ -37,24 +37,24 @@ Pass `-c wrangler.prod.jsonc` to every wrangler command from here on. Without it
 ## 3. Create the database
 
 ```sh
-npx wrangler d1 create feedback --jurisdiction eu -c wrangler.prod.jsonc
+pnpm exec wrangler d1 create feedback --jurisdiction eu -c wrangler.prod.jsonc
 ```
 
 `--jurisdiction eu` keeps the stored data in the EU. The privacy template in [datenschutz.md](datenschutz.md) assumes it.
 
-Copy the printed `database_id` into the existing `DB` entry in `wrangler.prod.jsonc`, in place of `REPLACE_WITH_D1_DATABASE_ID`. Wrangler may also append a second entry for the new database to the config. The Worker only reads the `DB` binding, so remove that extra entry. `npx wrangler d1 list` shows the ID again later.
+Copy the printed `database_id` into the existing `DB` entry in `wrangler.prod.jsonc`, in place of `REPLACE_WITH_D1_DATABASE_ID`. Wrangler may also append a second entry for the new database to the config. The Worker only reads the `DB` binding, so remove that extra entry. `pnpm exec wrangler d1 list` shows the ID again later.
 
 Then create the tables:
 
 ```sh
-npx wrangler d1 migrations apply feedback --remote -c wrangler.prod.jsonc
+pnpm exec wrangler d1 migrations apply feedback --remote -c wrangler.prod.jsonc
 ```
 
 ## 4. Deploy and set the secret
 
 ```sh
-npx wrangler deploy -c wrangler.prod.jsonc
-openssl rand -base64 48 | npx wrangler secret put ALTCHA_HMAC_KEY -c wrangler.prod.jsonc
+pnpm exec wrangler deploy -c wrangler.prod.jsonc
+openssl rand -base64 48 | pnpm exec wrangler secret put ALTCHA_HMAC_KEY -c wrangler.prod.jsonc
 ```
 
 `ALTCHA_HMAC_KEY` signs the proof-of-work challenges, so set it right after the first deploy. The first deploy also creates the custom domain and its certificate, which can take a few minutes. Check the Worker:
@@ -81,7 +81,7 @@ The Worker checks the Access token on every `/admin` request itself and answers 
    "ACCESS_AUD": "<AUD tag>",
    ```
 
-6. Deploy again: `npx wrangler deploy -c wrangler.prod.jsonc`
+6. Deploy again: `pnpm exec wrangler deploy -c wrangler.prod.jsonc`
 
 Open `https://feedback.example.com/admin`. After the Access login, the admin panel loads.
 
@@ -102,7 +102,7 @@ Don't add `http://localhost:4321` to a production site. For local testing, run t
 Set `NTFY_URL` in `wrangler.prod.jsonc` to a topic with a long random name, for example `https://ntfy.sh/feedback-3f9c2a7e5b1d`, and deploy again. If the topic needs a token:
 
 ```sh
-npx wrangler secret put NTFY_TOKEN -c wrangler.prod.jsonc
+pnpm exec wrangler secret put NTFY_TOKEN -c wrangler.prod.jsonc
 ```
 
 The push contains the site, the kind of post and a link to the admin panel. With `NTFY_INCLUDE_TEXT` set to `"true"` it also contains the post text, which then goes to the ntfy server. Mention ntfy in your privacy policy if you turn it on.
@@ -118,23 +118,23 @@ Deploy the site, send a test post and approve it in the queue.
 
 ## Local testing
 
-In this repository, `npm run dev` starts the Worker on `http://localhost:8787` with a local database and opens `/admin` without Access. Add your site there with the origin of its dev server, for example `http://localhost:4321`, and point the site's `endpoint` prop at `http://localhost:8787`.
+In this repository, `pnpm run dev` starts the Worker on `http://localhost:8787` with a local database and opens `/admin` without Access. Add your site there with the origin of its dev server, for example `http://localhost:4321`, and point the site's `endpoint` prop at `http://localhost:8787`.
 
 ## Updating
 
 ```sh
 git pull
-npm install
+pnpm install
 cd worker
-npx wrangler d1 migrations apply feedback --remote -c wrangler.prod.jsonc
-npx wrangler deploy -c wrangler.prod.jsonc
+pnpm exec wrangler d1 migrations apply feedback --remote -c wrangler.prod.jsonc
+pnpm exec wrangler deploy -c wrangler.prod.jsonc
 ```
 
 Wrangler records which migrations ran and applies only new ones.
 
 ## Troubleshooting
 
-`Invalid property: databaseId => Invalid uuid [code: 7400]`: the config still has `REPLACE_WITH_D1_DATABASE_ID`, or the command ran without `-c wrangler.prod.jsonc`. Copy the ID from `npx wrangler d1 list` into the `DB` entry.
+`Invalid property: databaseId => Invalid uuid [code: 7400]`: the config still has `REPLACE_WITH_D1_DATABASE_ID`, or the command ran without `-c wrangler.prod.jsonc`. Copy the ID from `pnpm exec wrangler d1 list` into the `DB` entry.
 
 `git status` shows `worker/wrangler.jsonc` as changed after a wrangler command: the command ran without `-c` and wrangler wrote into the template, sometimes with your database ID. Move the values you need into `wrangler.prod.jsonc` and run `git checkout -- worker/wrangler.jsonc`.
 

@@ -24,11 +24,11 @@ The Worker imports `astro-feedback-board/protocol` from the package, so kinds, t
 ## Local development
 
 ```sh
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
-`npm run dev` creates `worker/.dev.vars` if it is missing, applies the D1 migrations, seeds the `demo` site and starts both servers:
+`pnpm run dev` creates `worker/.dev.vars` if it is missing, applies the D1 migrations, seeds the `demo` site and starts both servers:
 
 - Worker: http://localhost:8787, admin panel at http://localhost:8787/admin
 - Demo site: http://localhost:4321, board at http://localhost:4321/feedback
@@ -37,7 +37,7 @@ Open the demo under `localhost:4321`. The Worker only accepts posts from origins
 
 `.dev.vars` sets `DEV_SKIP_ACCESS=true`, which opens `/admin` without Cloudflare Access. Never set it in production.
 
-`npm test` runs the component and Worker tests. The Worker tests start a local D1 database through wrangler's platform proxy and apply the migrations, so they check the real SQL, including foreign keys.
+`pnpm test` runs the component and Worker tests. The Worker tests start a local D1 database through wrangler's platform proxy and apply the migrations, so they check the real SQL, including foreign keys.
 
 ## Deploying the Worker
 

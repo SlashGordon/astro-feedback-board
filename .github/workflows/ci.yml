@@ -20,16 +20,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
+          cache: 'pnpm'
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
-      - run: npm run typecheck
+      - run: pnpm run typecheck
 
-      - run: npm test
+      - run: pnpm test
 
   # End-to-end: build the demo site with the package wired in as a workspace.
   demo:
@@ -38,11 +41,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: npm
+          cache: 'pnpm'
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
-      - run: npm run build --workspace demo
+      - run: pnpm --filter ./demo run build

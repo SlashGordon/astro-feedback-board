@@ -7,7 +7,7 @@ const worker = `${root}worker`;
 
 function step(label, args) {
   console.log(`\n▸ ${label}`);
-  const result = spawnSync("npx", args, { cwd: worker, stdio: "inherit" });
+  const result = spawnSync("pnpm", ["exec", ...args], { cwd: worker, stdio: "inherit" });
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
@@ -24,9 +24,9 @@ console.log(`
 `);
 
 const children = [
-  spawn("npx", ["wrangler", "dev", "--port", "8787"], { cwd: worker, stdio: "inherit" }),
+  spawn("pnpm", ["exec", "wrangler", "dev", "--port", "8787"], { cwd: worker, stdio: "inherit" }),
   // --ignore-lock keeps Astro in the foreground even when it detects a coding agent.
-  spawn("npx", ["astro", "dev", "--port", "4321", "--ignore-lock"], { cwd: `${root}demo`, stdio: "inherit" }),
+  spawn("pnpm", ["exec", "astro", "dev", "--port", "4321", "--ignore-lock"], { cwd: `${root}demo`, stdio: "inherit" }),
 ];
 
 let stopping = false;

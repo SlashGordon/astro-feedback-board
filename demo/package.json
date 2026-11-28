@@ -9,6 +9,6 @@
   },
   "dependencies": {
     "astro": "^7.4.13",
-    "astro-feedback-board": "*"
+    "astro-feedback-board": "workspace:*"
   }
 }
